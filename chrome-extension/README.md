@@ -5,8 +5,8 @@ This Chrome extension overrides the new tab page and redirects to a randomly sel
 
 ## Features
 - **New Tab Override**: Automatically redirects new tabs to one of your favorite websites
-- **Random Selection**: Randomly chooses from your list of URLs for variety
-- **Easy Configuration**: Simple options page to manage your list of websites
+- **Weighted Random Selection**: Randomly chooses from your list of URLs based on weights you assign
+- **Easy Configuration**: Simple options page to manage your list of websites and their weights
 
 ## Files
 - **manifest.json**: Contains metadata about the extension, including its name, version, and permissions
@@ -33,8 +33,17 @@ This Chrome extension overrides the new tab page and redirects to a randomly sel
 ## Configuration
 - Click the extension icon to open the options page
 - Add URLs one by one (no need to include http:// or https://)
+- Set a weight for each URL to control its frequency (higher weight = more frequently shown)
+- Edit existing entries by clicking the "Edit" button (this loads the URL and weight into the form)
 - Delete unwanted URLs by clicking the "Delete" button next to each one
 - Click "Save" to store your changes
+
+### About Weights
+The weight determines how frequently a URL will be selected:
+- Higher weights increase the probability of selection
+- For example, with URLs [A (weight 8), B (weight 2)]:
+  - URL A will be selected approximately 80% of the time
+  - URL B will be selected approximately 20% of the time
 
 ## Note
 If no URLs are configured, the new tab page will display a message prompting you to add URLs.
