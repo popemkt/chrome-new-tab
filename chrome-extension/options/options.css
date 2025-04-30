@@ -1,0 +1,121 @@
+/* Options page styling */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.container {
+  width: 80%;
+  max-width: 800px;
+  margin: 20px auto;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  color: #4285f4;
+  margin-top: 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.url-form {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: #4285f4;
+}
+
+button {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+#add-url {
+  border-radius: 0 4px 4px 0;
+}
+
+button:hover {
+  background-color: #3367d6;
+}
+
+.url-list {
+  margin: 20px 0;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #eee;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+li:hover {
+  background-color: #f9f9f9;
+}
+
+.delete-button {
+  background-color: #db4437;
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.delete-button:hover {
+  background-color: #c53929;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+}
+
+#save-urls {
+  padding: 10px 20px;
+  background-color: #0f9d58;
+  border-radius: 4px;
+}
+
+#save-urls:hover {
+  background-color: #0b8043;
+}
+
+#status {
+  margin-left: 20px;
+  color: #0f9d58;
+  font-weight: bold;
+}
+
+.empty-message {
+  color: #999;
+  font-style: italic;
+}

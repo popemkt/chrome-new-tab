@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab URL Redirector - Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>New Tab URL Redirector</h1>
+    <p>Configure URLs to open when a new tab is created. One of these URLs will be randomly selected each time.</p>
+    
+    <div class="url-form">
+      <input type="text" id="new-url" placeholder="Enter a URL (e.g., google.com)">
+      <button id="add-url">Add URL</button>
+    </div>
+    
+    <div class="url-list">
+      <h2>Your URLs:</h2>
+      <ul id="urls-container">
+        <!-- URLs will be added here dynamically -->
+      </ul>
+    </div>
+    
+    <div class="actions">
+      <button id="save-urls">Save</button>
+      <div id="status"></div>
+    </div>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>
