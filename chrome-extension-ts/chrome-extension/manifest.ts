@@ -104,10 +104,11 @@ const manifest = {
       // JavaScript files to inject
       js: ['content/index.iife.js'],
     },
-    {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-      js: ['content-ui/index.iife.js'],
-    },
+    // [GUIDE] Content UI script is disabled but can be re-enabled by uncommenting
+    // {
+    //   matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+    //   js: ['content-ui/index.iife.js'],
+    // },
     {
       matches: ['http://*/*', 'https://*/*', '<all_urls>'],
       css: ['content.css'],  // CSS file to inject
