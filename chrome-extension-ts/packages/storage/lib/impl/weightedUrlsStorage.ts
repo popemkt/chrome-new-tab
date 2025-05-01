@@ -1,16 +1,31 @@
+// STORAGE IMPLEMENTATION MODULE
+// This file defines the TypeScript interfaces and implementation for the weighted URLs storage
+
+// Import the base storage types and factory function
 import type { BaseStorage } from '../base/index.js';
 import { createStorage, StorageEnum } from '../base/index.js';
 
 /**
- * Interface defining a weighted URL entry
+ * TYPESCRIPT INTERFACE: WeightedUrl
+ * This defines the shape of each URL entry in our storage
+ * 
+ * TypeScript interfaces provide compile-time type checking to prevent errors
+ * like trying to access properties that don't exist or using incorrect types
  */
 export interface WeightedUrl {
-  url: string;
-  weight: number;
+  url: string;   // The URL to redirect to
+  weight: number; // The probability weight for selection
 }
 
 /**
- * Storage interface for weighted URLs with added functionality
+ * TYPESCRIPT TYPE EXTENSION: WeightedUrlsStorage
+ * 
+ * This creates a new type that:
+ * 1. Extends the BaseStorage type with our WeightedUrl[] data type
+ * 2. Adds additional methods specific to managing weighted URLs
+ * 
+ * IMPORTANT: This pattern shows how TypeScript allows extending existing types
+ * with additional functionality while maintaining type safety
  */
 export type WeightedUrlsStorage = BaseStorage<WeightedUrl[]> & {
   /**
@@ -45,14 +60,24 @@ export type WeightedUrlsStorage = BaseStorage<WeightedUrl[]> & {
   migrateFromOldFormat: () => Promise<void>;
 };
 
-// Create base storage with empty array as fallback
-const storage = createStorage<WeightedUrl[]>('weighted-urls-storage-key', [], {
-  storageEnum: StorageEnum.Sync, // Use sync storage to share between devices
-  liveUpdate: true, // Enable live updates for real-time changes across extension components
-});
+// STORAGE CREATION - CORE FUNCTIONALITY
+// Create the base storage instance with our WeightedUrl[] type
+
+// IMPORTANT: This factory function pattern is a key part of the architecture
+// It creates a storage wrapper with strongly-typed data and operations
+const storage = createStorage<WeightedUrl[]>(
+  'weighted-urls-storage-key',  // Storage key used in Chrome's storage API
+  [],                           // Default value (empty array) if storage is empty
+  {
+    // CONFIGURATION OPTIONS
+    storageEnum: StorageEnum.Sync, // Use sync storage to share between devices
+    liveUpdate: true,             // Enable live updates for real-time changes across components
+  }
+);
 
 /**
- * Ensure URL has a protocol (http:// or https://)
+ * UTILITY FUNCTION: Ensure URL has a protocol
+ * This adds https:// to URLs if they don't already have a protocol
  */
 function ensureUrlHasProtocol(url: string): string {
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -62,25 +87,36 @@ function ensureUrlHasProtocol(url: string): string {
 }
 
 /**
- * Implementation of the weighted URLs storage with additional methods
+ * STORAGE IMPLEMENTATION
+ * This creates the actual weightedUrlsStorage object by:
+ * 1. Starting with the base storage object (using spread operator)
+ * 2. Adding custom methods that implement our specific functionality
+ * 
+ * This pattern combines the base operations (get, set) with specialized methods
  */
 export const weightedUrlsStorage: WeightedUrlsStorage = {
+  // COMPOSITION: Include all methods from the base storage
   ...storage,
   
+  // CUSTOM METHOD: Get random URL with weighted probability
   getRandomUrl: async () => {
+    // Get current list of URLs
     const weightedUrls = await storage.get();
     
+    // Handle empty list case
     if (!weightedUrls || weightedUrls.length === 0) {
       return null;
     }
     
-    // Calculate total weight
+    // ALGORITHM: Weighted random selection
+    // Step 1: Calculate total weight
     const totalWeight = weightedUrls.reduce((sum, item) => sum + item.weight, 0);
     
-    // Generate a random number between 0 and totalWeight
+    // Step 2: Generate a random number within total weight range
     let random = Math.random() * totalWeight;
     
-    // Find the URL that corresponds to the random value
+    // Step 3: Find URL that corresponds to the random value
+    // This works by subtracting each weight from random until we go <= 0
     for (const item of weightedUrls) {
       random -= item.weight;
       if (random <= 0) {
@@ -88,45 +124,54 @@ export const weightedUrlsStorage: WeightedUrlsStorage = {
       }
     }
     
-    // Fallback (should never reach here unless empty array)
+    // Fallback (should only reach here in extremely rare cases)
     return weightedUrls.length > 0 ? ensureUrlHasProtocol(weightedUrls[0].url) : null;
   },
   
+  // CUSTOM METHOD: Add or update URL
   addUrl: async (url: string, weight: number = 1) => {
-    // Trim URL and ensure valid weight
+    // Data validation and normalization
     const trimmedUrl = url.trim();
     const validWeight = Math.max(1, weight); // Ensure weight is at least 1
     
     if (!trimmedUrl) return;
     
+    // IMPORTANT: Pattern for updating state in storage
+    // The set method takes a function that receives current state and returns new state
     await storage.set(currentUrls => {
       // Check if URL already exists
       const existingIndex = currentUrls.findIndex(item => item.url === trimmedUrl);
       
       if (existingIndex >= 0) {
-        // Update weight if URL already exists
+        // IMMUTABLE UPDATE: Create a new array instead of modifying existing one
+        // This is a common pattern in React and modern JS for predictable state management
         const updatedUrls = [...currentUrls];
         updatedUrls[existingIndex].weight = validWeight;
         return updatedUrls;
       }
       
-      // Add new URL with weight
+      // IMMUTABLE UPDATE: Return new array with added item
       return [...currentUrls, { url: trimmedUrl, weight: validWeight }];
     });
   },
   
+  // CUSTOM METHOD: Remove a URL
   removeUrl: async (url: string) => {
+    // FUNCTIONAL APPROACH: Using filter for immutable removal
     await storage.set(currentUrls => {
       return currentUrls.filter(item => item.url !== url);
     });
   },
   
+  // CUSTOM METHOD: Update a URL's weight
   updateUrlWeight: async (url: string, weight: number) => {
     const validWeight = Math.max(1, weight); // Ensure weight is at least 1
     
+    // FUNCTIONAL APPROACH: Using map for immutable updates
     await storage.set(currentUrls => {
       return currentUrls.map(item => {
         if (item.url === url) {
+          // OBJECT SPREAD: Create a new object with updated weight
           return { ...item, weight: validWeight };
         }
         return item;
@@ -134,19 +179,23 @@ export const weightedUrlsStorage: WeightedUrlsStorage = {
     });
   },
   
+  // CUSTOM METHOD: Migrate from old format to new format
+  // This allows backward compatibility with previous versions
   migrateFromOldFormat: async () => {
-    // Check if we need to migrate from old format
+    // Check if Chrome API is available (necessary for testing/development)
     if (chrome && chrome.storage) {
+      // Get data stored in old format
       const result = await chrome.storage.sync.get(['urls']);
       
+      // If old format data exists, convert it
       if (result.urls && Array.isArray(result.urls) && result.urls.length > 0) {
-        // Convert old URLs to weighted URLs
+        // Map old URLs to new format with default weight
         const weightedUrls: WeightedUrl[] = result.urls.map((url: string) => ({ 
           url, 
           weight: 1 
         }));
         
-        // Save the converted URLs
+        // Save in new format
         await storage.set(weightedUrls);
         
         // Clean up old data
