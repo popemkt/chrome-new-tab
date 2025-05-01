@@ -122,9 +122,9 @@ const Options = () => {
           <button className="save-button" onClick={saveUrls}>Save</button>
           <div id="status">{statusMessage}</div>
           
-          <ToggleButton onClick={exampleThemeStorage.toggle}>
+          <button onClick={exampleThemeStorage.toggle}>
             {isLight ? 'Dark Mode' : 'Light Mode'}
-          </ToggleButton>
+          </button>
         </div>
       </div>
     </div>

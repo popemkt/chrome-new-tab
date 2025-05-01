@@ -8,7 +8,7 @@ type ThemeStorage = BaseStorage<Theme> & {
 };
 
 const storage = createStorage<Theme>('theme-storage-key', 'light', {
-  storageEnum: StorageEnum.Local,
+  storageEnum: StorageEnum.Sync,
   liveUpdate: true,
 });
 
