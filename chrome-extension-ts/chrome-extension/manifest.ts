@@ -20,7 +20,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 const manifest = {
   manifest_version: 3,
   default_locale: 'en',
-  name: '__MSG_extensionName__',
+  name: 'New Tab URL Redirector',
   browser_specific_settings: {
     gecko: {
       id: 'example@example.com',
