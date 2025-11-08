@@ -120,7 +120,7 @@ Each page has its own entry points:
 
 Understanding how files connect requires tracing the entry points:
 
-1. The manifest specifies HTML files for different extension components
+1. The manifest sp ecifies HTML files for different extension components
 2. Each HTML file loads a JavaScript entry point
 3. These entry points import components and utilities from other files
 4. Components use shared packages for common functionality

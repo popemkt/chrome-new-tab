@@ -6,6 +6,66 @@ This document explains the `turbo.json` configuration file, which is the main en
 
 The `turbo.json` file defines how tasks run across the monorepo. It specifies dependencies between tasks, caching behavior, and output locations.
 
+## How Turborepo Determines Dependent Packages in This Project
+
+In this monorepo, Turborepo automatically figures out the relationships between packages using the workspace and dependency configuration files. Here’s how it works specifically for this project:
+
+### 1. Workspace Discovery
+
+The file [`pnpm-workspace.yaml`](./pnpm-workspace.yaml) defines which directories are considered workspaces:
+
+```yaml
+packages:
+  - 'chrome-extension'
+  - 'pages/*'
+  - 'packages/*'
+  - 'tests/*'
+```
+
+This means all subfolders under `pages/`, `packages/`, `tests/`, and the `chrome-extension` directory itself are treated as separate packages by pnpm and Turborepo.
+
+### 2. Package Dependencies
+
+Each workspace has its own `package.json` file. If one package lists another workspace package in its `dependencies` or `devDependencies`, Turborepo recognizes this as a dependency. For example, if `packages/dev-utils/package.json` lists `@extension/shared` as a dependency, Turborepo knows to build `@extension/shared` before `@extension/dev-utils`.
+
+### 3. turbo.json and Task Dependencies
+
+The [`turbo.json`](./turbo.json) file configures which tasks to run and their relationships. For example, a task definition like:
+
+```json
+"build": ["^build", "ready"]
+```
+
+means that before running `build` in a package, Turborepo will run `build` in all dependency packages (the `^build` part) and the `ready` task in the current package.
+
+### 4. Example from This Project
+
+When you run:
+
+```bash
+npx turbo run build --dry
+```
+
+Turborepo outputs a list of all packages and their tasks, showing dependencies and dependents. For example, you might see:
+
+```
+chrome-extension#build
+  Dependencies: @extension/dev-utils#build, @extension/env#build, ...
+  Dependents: (none)
+```
+
+This means the `chrome-extension` package’s build depends on the build tasks of several other packages, as determined by the dependencies set in their `package.json` files.
+
+### 5. Summary
+
+- The workspace structure is defined in `pnpm-workspace.yaml`.
+- Each package’s dependencies are set in its `package.json`.
+- Turborepo reads these to build a dependency graph.
+- Task dependencies are further configured in `turbo.json`.
+- Running `npx turbo run <task> --dry` shows the actual dependency order for tasks in this repo.
+
+This setup allows Turborepo to efficiently build, test, and run tasks only where needed, in the correct order, across all packages in the monorepo.
+
 ## Key Components
 
 ### Global Settings

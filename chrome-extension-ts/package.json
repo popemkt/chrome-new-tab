@@ -1,7 +1,7 @@
 {
   "name": "chrome-extension-boilerplate-react-vite",
   "version": "0.4.3",
-  "description": "chrome extension boilerplate",
+  "description": "New tab redirector",
   "license": "MIT",
   "private": true,
   "sideEffects": false,
