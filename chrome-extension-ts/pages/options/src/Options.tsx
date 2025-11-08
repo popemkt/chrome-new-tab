@@ -1,9 +1,14 @@
 import '@src/Options.css';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage, weightedUrlsStorage, WeightedUrl } from '@extension/storage';
 
 type SettingsTab = 'redirector' | 'organizer';
+
+interface DuplicateGroup {
+  url: string;
+  tabs: chrome.tabs.Tab[];
+}
 
 const Options = () => {
   // State management
@@ -16,6 +21,8 @@ const Options = () => {
   const [urlWeight, setUrlWeight] = useState(1);
   const [statusMessage, setStatusMessage] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Functions for URL management
   const addUrl = useCallback(async () => {
@@ -53,6 +60,93 @@ const Options = () => {
     e.preventDefault();
     addUrl();
   }, [addUrl]);
+
+  // Find duplicate tabs
+  const scanForDuplicates = useCallback(async () => {
+    setIsScanning(true);
+    try {
+      const tabs = await chrome.tabs.query({});
+      const urlMap = new Map<string, chrome.tabs.Tab[]>();
+
+      // Group tabs by URL
+      tabs.forEach(tab => {
+        if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+          const existing = urlMap.get(tab.url) || [];
+          existing.push(tab);
+          urlMap.set(tab.url, existing);
+        }
+      });
+
+      // Filter only URLs with duplicates (more than 1 tab)
+      const duplicates: DuplicateGroup[] = [];
+      urlMap.forEach((tabs, url) => {
+        if (tabs.length > 1) {
+          duplicates.push({ url, tabs });
+        }
+      });
+
+      // Sort by number of duplicates (descending)
+      duplicates.sort((a, b) => b.tabs.length - a.tabs.length);
+      setDuplicateGroups(duplicates);
+    } catch (error) {
+      console.error('Error scanning for duplicates:', error);
+    } finally {
+      setIsScanning(false);
+    }
+  }, []);
+
+  // Close specific tab
+  const closeTab = useCallback(async (tabId: number) => {
+    try {
+      await chrome.tabs.remove(tabId);
+      // Rescan after closing
+      await scanForDuplicates();
+    } catch (error) {
+      console.error('Error closing tab:', error);
+    }
+  }, [scanForDuplicates]);
+
+  // Close all duplicates except the first one for a URL
+  const closeDuplicates = useCallback(async (url: string) => {
+    const group = duplicateGroups.find(g => g.url === url);
+    if (!group || group.tabs.length <= 1) return;
+
+    try {
+      // Keep the first tab, close the rest
+      const tabIdsToClose = group.tabs.slice(1).map(tab => tab.id).filter((id): id is number => id !== undefined);
+      if (tabIdsToClose.length > 0) {
+        await chrome.tabs.remove(tabIdsToClose);
+        await scanForDuplicates();
+      }
+    } catch (error) {
+      console.error('Error closing duplicate tabs:', error);
+    }
+  }, [duplicateGroups, scanForDuplicates]);
+
+  // Close all duplicates across all URLs
+  const closeAllDuplicates = useCallback(async () => {
+    if (duplicateGroups.length === 0) return;
+
+    try {
+      const allTabIdsToClose: number[] = [];
+      
+      // Collect all duplicate tab IDs (keeping first tab of each group)
+      duplicateGroups.forEach(group => {
+        const tabIdsToClose = group.tabs
+          .slice(1)
+          .map(tab => tab.id)
+          .filter((id): id is number => id !== undefined);
+        allTabIdsToClose.push(...tabIdsToClose);
+      });
+
+      if (allTabIdsToClose.length > 0) {
+        await chrome.tabs.remove(allTabIdsToClose);
+        await scanForDuplicates();
+      }
+    } catch (error) {
+      console.error('Error closing all duplicate tabs:', error);
+    }
+  }, [duplicateGroups, scanForDuplicates]);
 
   return (
     <div className={`App ${isLight ? '' : 'dark bg-gray-800 text-gray-100'}`}>
@@ -149,10 +243,70 @@ const Options = () => {
               </div>
             </div>
           ) : (
-            <div className="container tab-placeholder">
+            <div className="container">
               <h1>Tab Organizer</h1>
-              <p>This section is reserved for upcoming tab organization tools.</p>
-              <p className="placeholder-hint">Stay tuned! Configure everything else from the sidebar.</p>
+              <p>Find and manage duplicate tabs across all your windows.</p>
+
+              <div className="organizer-actions">
+                <button className="scan-button" onClick={scanForDuplicates} disabled={isScanning}>
+                  {isScanning ? 'Scanning...' : 'Scan for Duplicates'}
+                </button>
+                {duplicateGroups.length > 0 && (
+                  <button className="close-all-button" onClick={closeAllDuplicates}>
+                    Close All Duplicates ({duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0)} tabs)
+                  </button>
+                )}
+              </div>
+
+              {duplicateGroups.length > 0 ? (
+                <div className="duplicates-list">
+                  <h2>Found {duplicateGroups.length} URLs with duplicates</h2>
+                  {duplicateGroups.map((group, index) => (
+                    <div key={index} className="duplicate-group">
+                      <div className="duplicate-header">
+                        <div className="duplicate-url-info">
+                          <span className="duplicate-count">{group.tabs.length} tabs</span>
+                          <span className="duplicate-url" title={group.url}>
+                            {group.url}
+                          </span>
+                        </div>
+                        <button
+                          className="close-duplicates-button"
+                          onClick={() => closeDuplicates(group.url)}
+                          title="Close all duplicates except the first one">
+                          Close {group.tabs.length - 1} Duplicate{group.tabs.length - 1 > 1 ? 's' : ''}
+                        </button>
+                      </div>
+                      <ul className="duplicate-tabs">
+                        {group.tabs.map((tab, tabIndex) => (
+                          <li key={tab.id} className="duplicate-tab-item">
+                            <div className="tab-info">
+                              {tab.favIconUrl && (
+                                <img src={tab.favIconUrl} alt="" className="tab-favicon" />
+                              )}
+                              <span className="tab-title">{tab.title || 'Untitled'}</span>
+                              {tabIndex === 0 && <span className="tab-badge">Keep</span>}
+                            </div>
+                            <button
+                              className="close-tab-button"
+                              onClick={() => tab.id && closeTab(tab.id)}
+                              title="Close this tab">
+                              ✕
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !isScanning && (
+                  <div className="no-duplicates">
+                    <p>No duplicate tabs found! 🎉</p>
+                    <p className="placeholder-hint">Click "Scan for Duplicates" to check again.</p>
+                  </div>
+                )
+              )}
             </div>
           )}
         </main>
