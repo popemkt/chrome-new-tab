@@ -12,19 +12,21 @@ const Options = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('redirector');
 
   return (
-    <div className={`min-h-screen w-full p-5 ${isLight ? 'bg-white text-gray-900' : 'dark bg-gray-800 text-gray-100'}`}>
-      <div className="flex gap-5 min-h-[80vh]">
-        <aside className="w-56 bg-gray-100 dark:bg-gray-900 rounded-xl p-5 shadow-lg flex flex-col gap-4">
-          <h2 className="text-base font-semibold text-gray-700 dark:text-gray-200">Settings</h2>
+    <div className={`min-h-screen w-full p-6 ${isLight ? 'bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900' : 'dark bg-gradient-to-br from-gray-900 to-gray-800 text-gray-100'}`}>
+      <div className="flex gap-6 min-h-[85vh] max-w-[1600px] mx-auto">
+        <aside className="w-64 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-gray-200/50 dark:border-gray-700/50 flex flex-col gap-5">
+          <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">Settings</h2>
+          </div>
           <nav>
-            <ul className="flex flex-col gap-2.5 list-none p-0 m-0">
+            <ul className="flex flex-col gap-2 list-none p-0 m-0">
               <li>
                 <button
                   type="button"
-                  className={`w-full px-3.5 py-2.5 rounded-lg border-none text-left font-medium cursor-pointer transition-all ${
+                  className={`w-full px-4 py-3 rounded-xl border-none text-left font-medium cursor-pointer transition-all duration-200 ${
                     activeTab === 'redirector'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                      : 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-[1.01]'
                   }`}
                   onClick={() => setActiveTab('redirector')}>
                   Tab Redirector
@@ -33,10 +35,10 @@ const Options = () => {
               <li>
                 <button
                   type="button"
-                  className={`w-full px-3.5 py-2.5 rounded-lg border-none text-left font-medium cursor-pointer transition-all ${
+                  className={`w-full px-4 py-3 rounded-xl border-none text-left font-medium cursor-pointer transition-all duration-200 ${
                     activeTab === 'organizer'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-transparent text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                      : 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-[1.01]'
                   }`}
                   onClick={() => setActiveTab('organizer')}>
                   Tab Organizer
@@ -46,7 +48,7 @@ const Options = () => {
           </nav>
         </aside>
 
-        <main className="flex-1 bg-white dark:bg-gray-900 rounded-xl p-8 shadow-xl">
+        <main className="flex-1 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-2xl p-10 shadow-2xl border border-gray-200/50 dark:border-gray-700/50">
           {activeTab === 'redirector' ? <TabRedirector isLight={isLight} /> : <TabOrganizer isLight={isLight} />}
         </main>
       </div>

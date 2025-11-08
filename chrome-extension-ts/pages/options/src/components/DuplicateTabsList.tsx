@@ -114,19 +114,21 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-gray-100">Duplicate Tabs</h2>
-      <p className="mb-5 text-gray-600 dark:text-gray-400">Find and close tabs with identical URLs.</p>
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Duplicate Tabs</h2>
+        <p className="text-gray-600 dark:text-gray-400">Find and close tabs with identical URLs.</p>
+      </div>
 
-      <div className="flex gap-3 mb-5 items-center flex-wrap">
+      <div className="flex gap-3 mb-6 items-center flex-wrap">
         <button
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
           onClick={scanForDuplicates}
           disabled={isScanning || isDeleting}>
           {isScanning ? 'Scanning...' : 'Scan for Duplicates'}
         </button>
         {duplicateGroups.length > 0 && (
           <button
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+            className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-red-500/30 transition-all hover:scale-105"
             onClick={closeAllDuplicates}
             disabled={isDeleting}>
             {isDeleting ? 'Closing...' : `Close All Duplicates (${duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0)} tabs)`}
@@ -135,12 +137,12 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
       </div>
 
       {duplicateGroups.length > 0 ? (
-        <div className="mt-5">
-          <h3 className="text-lg font-semibold mb-5 text-gray-900 dark:text-gray-100">
+        <div className="mt-6">
+          <h3 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">
             Found {duplicateGroups.length} URLs with duplicates
           </h3>
           {duplicateGroups.map((group, index) => (
-            <div key={index} className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
+            <div key={index} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-5 mb-5 shadow-md">
               <div className="flex justify-between items-center mb-3 gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <span className="font-semibold text-red-600 dark:text-red-400 text-sm block mb-1">
@@ -151,7 +153,7 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
                   </span>
                 </div>
                 <button
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                  className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold shadow-md shadow-red-500/20 transition-all hover:scale-105 whitespace-nowrap"
                   onClick={() => closeDuplicates(group.url)}
                   disabled={isDeleting}
                   title="Close all duplicates except the first one">
@@ -162,7 +164,7 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
                 {group.tabs.map((tab, tabIndex) => (
                   <li
                     key={tab.id}
-                    className={`flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3 transition-all duration-200 ${
+                    className={`flex justify-between items-center p-4 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl gap-3 shadow-sm hover:shadow-md transition-all duration-200 ${
                       deletingTabId === tab.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                     }`}>
                     <div className="flex items-center gap-2.5 flex-1 min-w-0">

@@ -113,12 +113,15 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-gray-100">Old & Unused Tabs</h2>
-      <p className="mb-5 text-gray-600 dark:text-gray-400">
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Old & Unused Tabs</h2>
+        <p className="text-gray-600 dark:text-gray-400">
         Find tabs you haven't accessed recently, sorted from oldest to newest.
       </p>
 
-      <div className="flex gap-3 mb-5 items-center flex-wrap">
+      </div>
+
+      <div className="flex gap-3 mb-6 items-center flex-wrap">
         <div className="flex items-center gap-3">
           <label htmlFor="tabCount" className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Show top:
@@ -130,7 +133,7 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
             max="200"
             value={tabCount}
             onChange={e => setTabCount(Math.max(1, parseInt(e.target.value) || 30))}
-            className={`w-20 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`w-24 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
               isLight ? 'bg-white border-gray-300' : 'bg-gray-700 text-white border-gray-600'
             }`}
           />
@@ -138,7 +141,7 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
         </div>
 
         <button
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
           onClick={scanForOldTabs}
           disabled={isScanning || isDeleting}>
           {isScanning ? 'Scanning...' : 'Scan for Old Tabs'}
@@ -146,7 +149,7 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
 
         {oldTabs.length > 0 && (
           <button
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+            className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-red-500/30 transition-all hover:scale-105"
             onClick={closeAllOld}
             disabled={isDeleting}>
             {isDeleting ? 'Closing...' : `Close All (${oldTabs.length} tabs)`}
@@ -155,16 +158,16 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
       </div>
 
       {oldTabs.length > 0 ? (
-        <div className="mt-5">
-          <h3 className="text-lg font-semibold mb-5 text-gray-900 dark:text-gray-100">
+        <div className="mt-6">
+          <h3 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">
             Found {oldTabs.length} old tabs
           </h3>
-          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-5 shadow-md">
             <ul className="space-y-2">
               {oldTabs.map(({ tab, lastAccessed, ageDisplay }) => (
                 <li
                   key={tab.id}
-                  className={`flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3 transition-all duration-200 ${
+                  className={`flex justify-between items-center p-4 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl gap-3 shadow-sm hover:shadow-md transition-all duration-200 ${
                     deletingTabId === tab.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
                   }`}>
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
