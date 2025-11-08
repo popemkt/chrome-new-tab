@@ -37,6 +37,8 @@ const formatDate = (timestamp: number): string => {
 export const OldTabsList = ({ isLight }: OldTabsListProps) => {
   const [oldTabs, setOldTabs] = useState<OldTab[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingTabId, setDeletingTabId] = useState<number | null>(null);
   const [tabCount, setTabCount] = useState(30);
 
   const scanForOldTabs = useCallback(async () => {
@@ -76,11 +78,16 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
 
   const closeTab = useCallback(
     async (tabId: number) => {
+      setDeletingTabId(tabId);
       try {
+        // Small delay for animation
+        await new Promise(resolve => setTimeout(resolve, 200));
         await chrome.tabs.remove(tabId);
         await scanForOldTabs();
       } catch (error) {
         console.error('Error closing tab:', error);
+      } finally {
+        setDeletingTabId(null);
       }
     },
     [scanForOldTabs],
@@ -89,6 +96,7 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
   const closeAllOld = useCallback(async () => {
     if (oldTabs.length === 0) return;
 
+    setIsDeleting(true);
     try {
       const tabIdsToClose = oldTabs.map(t => t.tab.id).filter((id): id is number => id !== undefined);
 
@@ -98,6 +106,8 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
       }
     } catch (error) {
       console.error('Error closing all old tabs:', error);
+    } finally {
+      setIsDeleting(false);
     }
   }, [oldTabs, scanForOldTabs]);
 
@@ -130,15 +140,16 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
         <button
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           onClick={scanForOldTabs}
-          disabled={isScanning}>
+          disabled={isScanning || isDeleting}>
           {isScanning ? 'Scanning...' : 'Scan for Old Tabs'}
         </button>
 
         {oldTabs.length > 0 && (
           <button
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
-            onClick={closeAllOld}>
-            Close All ({oldTabs.length} tabs)
+            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+            onClick={closeAllOld}
+            disabled={isDeleting}>
+            {isDeleting ? 'Closing...' : `Close All (${oldTabs.length} tabs)`}
           </button>
         )}
       </div>
@@ -153,7 +164,9 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
               {oldTabs.map(({ tab, lastAccessed, ageDisplay }) => (
                 <li
                   key={tab.id}
-                  className="flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3">
+                  className={`flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3 transition-all duration-200 ${
+                    deletingTabId === tab.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                  }`}>
                   <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     {tab.favIconUrl && <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />}
                     <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -168,10 +181,11 @@ export const OldTabsList = ({ isLight }: OldTabsListProps) => {
                     </div>
                   </div>
                   <button
-                    className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors flex-shrink-0"
+                    className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => tab.id && closeTab(tab.id)}
+                    disabled={deletingTabId === tab.id || isDeleting}
                     title="Close this tab">
-                    ✕
+                    {deletingTabId === tab.id ? '⏳' : '✕'}
                   </button>
                 </li>
               ))}

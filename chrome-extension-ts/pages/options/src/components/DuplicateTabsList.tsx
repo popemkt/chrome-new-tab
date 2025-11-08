@@ -12,6 +12,8 @@ interface DuplicateTabsListProps {
 export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingTabId, setDeletingTabId] = useState<number | null>(null);
 
   const scanForDuplicates = useCallback(async () => {
     setIsScanning(true);
@@ -48,11 +50,16 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
 
   const closeTab = useCallback(
     async (tabId: number) => {
+      setDeletingTabId(tabId);
       try {
+        // Small delay for animation
+        await new Promise(resolve => setTimeout(resolve, 200));
         await chrome.tabs.remove(tabId);
         await scanForDuplicates();
       } catch (error) {
         console.error('Error closing tab:', error);
+      } finally {
+        setDeletingTabId(null);
       }
     },
     [scanForDuplicates],
@@ -63,6 +70,7 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
       const group = duplicateGroups.find(g => g.url === url);
       if (!group || group.tabs.length <= 1) return;
 
+      setIsDeleting(true);
       try {
         const tabIdsToClose = group.tabs.slice(1).map(tab => tab.id).filter((id): id is number => id !== undefined);
         if (tabIdsToClose.length > 0) {
@@ -71,6 +79,8 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
         }
       } catch (error) {
         console.error('Error closing duplicate tabs:', error);
+      } finally {
+        setIsDeleting(false);
       }
     },
     [duplicateGroups, scanForDuplicates],
@@ -79,6 +89,7 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
   const closeAllDuplicates = useCallback(async () => {
     if (duplicateGroups.length === 0) return;
 
+    setIsDeleting(true);
     try {
       const allTabIdsToClose: number[] = [];
 
@@ -96,6 +107,8 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
       }
     } catch (error) {
       console.error('Error closing all duplicate tabs:', error);
+    } finally {
+      setIsDeleting(false);
     }
   }, [duplicateGroups, scanForDuplicates]);
 
@@ -108,14 +121,15 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
         <button
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           onClick={scanForDuplicates}
-          disabled={isScanning}>
+          disabled={isScanning || isDeleting}>
           {isScanning ? 'Scanning...' : 'Scan for Duplicates'}
         </button>
         {duplicateGroups.length > 0 && (
           <button
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors"
-            onClick={closeAllDuplicates}>
-            Close All Duplicates ({duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0)} tabs)
+            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
+            onClick={closeAllDuplicates}
+            disabled={isDeleting}>
+            {isDeleting ? 'Closing...' : `Close All Duplicates (${duplicateGroups.reduce((sum, g) => sum + g.tabs.length - 1, 0)} tabs)`}
           </button>
         )}
       </div>
@@ -137,17 +151,20 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
                   </span>
                 </div>
                 <button
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
                   onClick={() => closeDuplicates(group.url)}
+                  disabled={isDeleting}
                   title="Close all duplicates except the first one">
-                  Close {group.tabs.length - 1} Duplicate{group.tabs.length - 1 > 1 ? 's' : ''}
+                  {isDeleting ? 'Closing...' : `Close ${group.tabs.length - 1} Duplicate${group.tabs.length - 1 > 1 ? 's' : ''}`}
                 </button>
               </div>
               <ul className="space-y-2">
                 {group.tabs.map((tab, tabIndex) => (
                   <li
                     key={tab.id}
-                    className="flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3">
+                    className={`flex justify-between items-center p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg gap-3 transition-all duration-200 ${
+                      deletingTabId === tab.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                    }`}>
                     <div className="flex items-center gap-2.5 flex-1 min-w-0">
                       {tab.favIconUrl && <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />}
                       <span className="text-sm text-gray-900 dark:text-gray-100 truncate">{tab.title || 'Untitled'}</span>
@@ -158,10 +175,11 @@ export const DuplicateTabsList = ({ isLight }: DuplicateTabsListProps) => {
                       )}
                     </div>
                     <button
-                      className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors flex-shrink-0"
+                      className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => tab.id && closeTab(tab.id)}
+                      disabled={deletingTabId === tab.id || isDeleting}
                       title="Close this tab">
-                      ✕
+                      {deletingTabId === tab.id ? '⏳' : '✕'}
                     </button>
                   </li>
                 ))}
