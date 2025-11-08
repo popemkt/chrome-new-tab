@@ -47,6 +47,8 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [batchSize, setBatchSize] = useState(10);
+  const [batchDelay, setBatchDelay] = useState(100);
 
   const exportTabs = useCallback(async () => {
     setIsExporting(true);
@@ -158,7 +160,6 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
       const groupIdMap = new Map<number, number>();
 
       let importedCount = 0;
-      const BATCH_SIZE = 10; // Import in small batches to avoid overwhelming the browser
 
       // Process each window
       for (const [oldWindowId, windowTabs] of tabsByWindow) {
@@ -217,19 +218,18 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
         }
 
         // Import tabs in batches
-        for (let i = 0; i < windowTabs.length; i += BATCH_SIZE) {
-          const batch = windowTabs.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < windowTabs.length; i += batchSize) {
+          const batch = windowTabs.slice(i, i + batchSize);
 
           await Promise.all(
             batch.map(async tab => {
               try {
-                // Create tab in discarded/suspended state to save memory
+                // Create tab
                 const newTab = await chrome.tabs.create({
                   windowId: targetWindowId,
                   url: tab.url,
                   active: false,
                   pinned: tab.pinned,
-                  // Chrome will automatically suspend tabs created in background
                 });
 
                 // Add to group if it had one (and groups API is available)
@@ -249,6 +249,14 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
                   await chrome.tabs.update(newTab.id!, { muted: true });
                 }
 
+                // IMMEDIATELY discard/suspend the tab to save memory
+                // This prevents the tab from loading and consuming resources
+                try {
+                  await chrome.tabs.discard(newTab.id!);
+                } catch (error) {
+                  console.warn(`Error discarding tab ${tab.url}:`, error);
+                }
+
                 importedCount++;
                 setImportProgress({ current: importedCount, total: data.tabs.length });
               } catch (error) {
@@ -258,7 +266,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
           );
 
           // Small delay between batches to prevent overwhelming the browser
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, batchDelay));
         }
       }
 
@@ -316,6 +324,46 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
             Restore tabs from a backup file. Tabs will be created in <strong>suspended state</strong> to prevent memory
             overload.
           </p>
+          
+          {/* Import Settings */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Batch Size
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={batchSize}
+                onChange={e => setBatchSize(Number(e.target.value))}
+                disabled={isImporting}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
+                  isLight ? 'bg-white border-gray-300' : 'bg-gray-700 text-white border-gray-600'
+                }`}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Tabs per batch</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Delay (ms)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="5000"
+                step="50"
+                value={batchDelay}
+                onChange={e => setBatchDelay(Number(e.target.value))}
+                disabled={isImporting}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
+                  isLight ? 'bg-white border-gray-300' : 'bg-gray-700 text-white border-gray-600'
+                }`}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Between batches</p>
+            </div>
+          </div>
+
           <label className="block">
             <input
               type="file"
@@ -383,7 +431,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
           <li className="flex gap-2">
             <span className="text-blue-600 dark:text-blue-400">•</span>
             <span>
-              <strong>Batch import:</strong> Tabs are imported in small batches (10 at a time) to prevent browser crashes
+              <strong>Batch import:</strong> Tabs are imported in configurable batches (default 10) with delays between batches to prevent browser crashes
             </span>
           </li>
           <li className="flex gap-2">
