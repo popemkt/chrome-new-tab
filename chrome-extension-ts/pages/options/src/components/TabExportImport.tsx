@@ -49,6 +49,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
   const [statusMessage, setStatusMessage] = useState('');
   const [batchSize, setBatchSize] = useState(10);
   const [batchDelay, setBatchDelay] = useState(100);
+  const [suspendDelay, setSuspendDelay] = useState(10000); // 10 seconds default
 
   const exportTabs = useCallback(async () => {
     setIsExporting(true);
@@ -249,13 +250,16 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
                   await chrome.tabs.update(newTab.id!, { muted: true });
                 }
 
-                // IMMEDIATELY discard/suspend the tab to save memory
-                // This prevents the tab from loading and consuming resources
-                try {
-                  await chrome.tabs.discard(newTab.id!);
-                } catch (error) {
-                  console.warn(`Error discarding tab ${tab.url}:`, error);
-                }
+                // Schedule tab suspension after delay to allow initial load
+                // This prevents blank tabs while still saving memory
+                const tabId = newTab.id!;
+                setTimeout(async () => {
+                  try {
+                    await chrome.tabs.discard(tabId);
+                  } catch (error) {
+                    console.warn(`Error discarding tab ${tab.url}:`, error);
+                  }
+                }, suspendDelay);
 
                 importedCount++;
                 setImportProgress({ current: importedCount, total: data.tabs.length });
@@ -294,23 +298,23 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Export & Import Tabs</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+      <div className="mb-5">
+        <h2 className="text-2xl font-bold mb-1 text-gray-900 dark:text-gray-100">Export & Import Tabs</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Backup and restore your tabs with full metadata (groups, pin state, mute state, etc.)
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-6">
+      <div className="grid md:grid-cols-2 gap-4 mb-5">
         {/* Export Section */}
-        <div className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border border-blue-200/50 dark:border-blue-700/50 rounded-2xl p-6 shadow-md">
-          <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">📤 Export</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <div className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border border-blue-200/50 dark:border-blue-700/50 rounded-xl p-5 shadow-sm">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">📤 Export</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
             Save all your tabs to a JSON file with complete metadata including groups, pin state, and window
             organization.
           </p>
           <button
-            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
+            className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium shadow-sm transition-colors"
             onClick={exportTabs}
             disabled={isExporting}>
             {isExporting ? '⏳ Exporting...' : '📥 Export All Tabs'}
@@ -318,15 +322,15 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
         </div>
 
         {/* Import Section */}
-        <div className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border border-green-200/50 dark:border-green-700/50 rounded-2xl p-6 shadow-md">
-          <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">📥 Import</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <div className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border border-green-200/50 dark:border-green-700/50 rounded-xl p-5 shadow-sm">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">📥 Import</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
             Restore tabs from a backup file. Tabs will be created in <strong>suspended state</strong> to prevent memory
             overload.
           </p>
           
           {/* Import Settings */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Batch Size
@@ -346,7 +350,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Delay (ms)
+                Batch Delay (ms)
               </label>
               <input
                 type="number"
@@ -362,6 +366,24 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Between batches</p>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Suspend Delay (s)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="60"
+                step="1"
+                value={suspendDelay / 1000}
+                onChange={e => setSuspendDelay(Number(e.target.value) * 1000)}
+                disabled={isImporting}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
+                  isLight ? 'bg-white border-gray-300' : 'bg-gray-700 text-white border-gray-600'
+                }`}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Before suspend</p>
+            </div>
           </div>
 
           <label className="block">
@@ -373,7 +395,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
               className="hidden"
               id="import-file-input"
             />
-            <span className="block w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl font-semibold shadow-lg shadow-green-500/30 transition-all hover:scale-105 text-center cursor-pointer">
+            <span className="block w-full px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium shadow-sm transition-colors text-center cursor-pointer">
               {isImporting ? '⏳ Importing...' : '📤 Import Tabs from File'}
             </span>
           </label>
@@ -382,7 +404,7 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
 
       {/* Progress Bar */}
       {importProgress && (
-        <div className="mb-6 bg-gray-100 dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/50 dark:border-gray-700/50">
+        <div className="mb-4 bg-gray-100 dark:bg-gray-800 rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Import Progress</span>
             <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
@@ -411,8 +433,8 @@ export const TabExportImport = ({ isLight }: TabExportImportProps) => {
       )}
 
       {/* Info Section */}
-      <div className="mt-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 shadow-inner">
-        <h3 className="text-lg font-bold mb-3 text-gray-900 dark:text-gray-100">ℹ️ Important Information</h3>
+      <div className="mt-6 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-5 shadow-sm">
+        <h3 className="text-base font-semibold mb-2 text-gray-900 dark:text-gray-100">ℹ️ Important Information</h3>
         <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <li className="flex gap-2">
             <span className="text-blue-600 dark:text-blue-400">•</span>

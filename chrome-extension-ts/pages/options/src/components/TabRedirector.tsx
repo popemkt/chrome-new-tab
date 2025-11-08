@@ -53,15 +53,14 @@ export const TabRedirector = ({ isLight }: TabRedirectorProps) => {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">New Tab URL Redirector</h1>
-        <p className="text-base text-gray-600 dark:text-gray-400">
-        Configure URLs to open when a new tab is created. One of these URLs will be randomly selected each time.
-      </p>
-
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">New Tab URL Redirector</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Configure URLs to open when a new tab is created. One of these URLs will be randomly selected each time.
+        </p>
       </div>
 
-      <form className="flex flex-wrap gap-3 mb-8" onSubmit={handleFormSubmit}>
+      <form className="flex flex-wrap gap-3 mb-6" onSubmit={handleFormSubmit}>
         <input
           type="text"
           value={newUrl}
@@ -83,7 +82,7 @@ export const TabRedirector = ({ isLight }: TabRedirectorProps) => {
         />
         <button
           type="submit"
-          className={`px-6 py-3 rounded-xl text-white font-semibold shadow-lg transition-all hover:scale-105 ${
+          className={`px-4 py-2.5 rounded-lg text-white font-medium shadow-sm transition-colors ${
             isEditing
               ? 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-blue-500/30'
               : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 shadow-green-500/30'
@@ -92,30 +91,30 @@ export const TabRedirector = ({ isLight }: TabRedirectorProps) => {
         </button>
       </form>
 
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 italic">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 italic">
         To edit an existing entry: Click "Edit" and the entry will be loaded into the form above.
       </p>
 
-      <div className="border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 mb-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 shadow-inner">
-        <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Your URLs</h2>
+      <div className="border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-5 mb-6 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 shadow-sm">
+        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Your URLs</h2>
         <ul className="space-y-3">
           {urlList && urlList.length > 0 ? (
             urlList.map((item: WeightedUrl, index: number) => (
               <li
                 key={`${item.url}-${index}`}
-                className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-[1.01]">
+                className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-lg shadow-sm hover:shadow transition-colors">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                   <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.url}</span>
                   <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Weight: {item.weight}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg text-sm font-semibold shadow-md shadow-blue-500/20 transition-all hover:scale-105"
+                    className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded text-sm font-medium shadow-sm transition-colors"
                     onClick={() => editUrl(item.url, item.weight)}>
                     Edit
                   </button>
                   <button
-                    className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white rounded-lg text-sm font-semibold shadow-md shadow-red-500/20 transition-all hover:scale-105"
+                    className="px-3 py-1.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white rounded text-sm font-medium shadow-sm transition-colors"
                     onClick={() => deleteUrl(item.url)}>
                     Delete
                   </button>
@@ -130,13 +129,13 @@ export const TabRedirector = ({ isLight }: TabRedirectorProps) => {
 
       <div className="flex items-center justify-center gap-4 flex-wrap">
         <button
-          className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-xl font-semibold shadow-lg shadow-green-500/30 transition-all hover:scale-105"
+          className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-lg font-medium shadow-sm transition-colors"
           onClick={saveUrls}>
           Save Changes
         </button>
         {statusMessage && <div className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg font-medium">{statusMessage}</div>}
         <button
-          className="px-6 py-3 bg-gradient-to-r from-gray-200 to-gray-100 dark:from-gray-700 dark:to-gray-600 hover:from-gray-300 hover:to-gray-200 dark:hover:from-gray-600 dark:hover:to-gray-500 text-gray-900 dark:text-gray-100 rounded-xl font-medium shadow-md transition-all hover:scale-105"
+          className="px-6 py-2.5 bg-gradient-to-r from-gray-200 to-gray-100 dark:from-gray-700 dark:to-gray-600 hover:from-gray-300 hover:to-gray-200 dark:hover:from-gray-600 dark:hover:to-gray-500 text-gray-900 dark:text-gray-100 rounded-lg font-medium shadow-sm transition-colors"
           onClick={exampleThemeStorage.toggle}>
           {isLight ? '🌙 Dark Mode' : '☀️ Light Mode'}
         </button>

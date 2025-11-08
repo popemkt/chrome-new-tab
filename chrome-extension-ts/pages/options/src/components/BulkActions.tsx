@@ -276,17 +276,17 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">Bulk Actions</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+      <div className="mb-5">
+        <h2 className="text-2xl font-bold mb-1 text-gray-900 dark:text-gray-100">Bulk Actions</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Search, filter, and perform bulk operations on your tabs with regex support.
         </p>
       </div>
 
       {/* Load Tabs Button */}
-      <div className="mb-6">
+      <div className="mb-5">
         <button
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
+          className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium shadow-sm transition-colors"
           onClick={loadTabs}
           disabled={isLoading}>
           {isLoading ? '⏳ Loading...' : '🔄 Load All Tabs'}
@@ -296,8 +296,8 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
       {/* Search and Filter */}
       {tabs.length > 0 && (
         <>
-          <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 mb-6 shadow-md">
-            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">🔍 Search & Filter</h3>
+          <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-5 mb-5 shadow-sm">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">🔍 Search & Filter</h3>
 
             <div className="grid md:grid-cols-3 gap-4 mb-4">
               <div className="md:col-span-2">
@@ -309,7 +309,7 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Enter search term or regex pattern..."
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                     isLight ? 'bg-white border-gray-300' : 'bg-gray-700 text-white border-gray-600'
                   }`}
                 />
@@ -345,7 +345,7 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
             </div>
 
             <button
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/30 transition-all hover:scale-105"
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white rounded-lg font-medium shadow-sm transition-colors"
               onClick={applyFilter}>
               🔎 Apply Filter
             </button>
@@ -353,9 +353,9 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
 
           {/* Results Table */}
           {filteredTabs.length > 0 && (
-            <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-6 mb-6 shadow-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-5 mb-5 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   📋 Results ({filteredTabs.length} tabs)
                 </h3>
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -369,7 +369,7 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
                 </label>
               </div>
 
-              <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-xl">
+              <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
                 <table className="w-full">
                   <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
                     <tr>
@@ -444,19 +444,19 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
 
           {/* Bulk Actions */}
           {filteredTabs.length > 0 && (
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="grid md:grid-cols-2 gap-4 mb-5">
               {/* Quick Actions */}
-              <div className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border border-blue-200/50 dark:border-blue-700/50 rounded-2xl p-6 shadow-md">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">⚡ Quick Actions</h3>
+              <div className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border border-blue-200/50 dark:border-blue-700/50 rounded-xl p-5 shadow-sm">
+                <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">⚡ Quick Actions</h3>
                 <div className="space-y-3">
                   <button
-                    className="w-full px-5 py-3 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/30 transition-all hover:scale-105"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium shadow-sm transition-colors"
                     onClick={suspendSelected}
                     disabled={isLoading}>
                     💤 Suspend Selected
                   </button>
                   <button
-                    className="w-full px-5 py-3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl font-semibold shadow-lg shadow-red-500/30 transition-all hover:scale-105"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium shadow-sm transition-colors"
                     onClick={closeSelected}
                     disabled={isLoading}>
                     ❌ Close Selected
@@ -465,8 +465,8 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
               </div>
 
               {/* Archive Action */}
-              <div className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border border-green-200/50 dark:border-green-700/50 rounded-2xl p-6 shadow-md">
-                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">📚 Archive</h3>
+              <div className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border border-green-200/50 dark:border-green-700/50 rounded-xl p-5 shadow-sm">
+                <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">📚 Archive</h3>
                 <div className="space-y-3">
                   <input
                     type="text"
@@ -478,7 +478,7 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
                     }`}
                   />
                   <button
-                    className="w-full px-5 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl font-semibold shadow-lg shadow-green-500/30 transition-all hover:scale-105"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium shadow-sm transition-colors"
                     onClick={archiveSelected}
                     disabled={isLoading}>
                     📦 Archive & Close
@@ -493,8 +493,8 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
 
           {/* Rename Action */}
           {filteredTabs.length > 0 && (
-            <div className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 border border-purple-200/50 dark:border-purple-700/50 rounded-2xl p-6 mb-6 shadow-md">
-              <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">✏️ Bulk Rename (Regex)</h3>
+            <div className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 border border-purple-200/50 dark:border-purple-700/50 rounded-xl p-5 mb-5 shadow-sm">
+              <h3 className="text-base font-semibold mb-3 text-gray-900 dark:text-gray-100">✏️ Bulk Rename (Regex)</h3>
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -526,7 +526,7 @@ export const BulkActions = ({ isLight }: BulkActionsProps) => {
                 </div>
               </div>
               <button
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/30 transition-all hover:scale-105"
+                className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium shadow-sm transition-colors"
                 onClick={renameSelected}
                 disabled={isLoading}>
                 🔄 Rename URLs
