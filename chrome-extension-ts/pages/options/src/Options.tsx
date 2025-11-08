@@ -1,16 +1,17 @@
 import '@src/Options.css';
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage, weightedUrlsStorage, WeightedUrl } from '@extension/storage';
-import { ToggleButton } from '@extension/ui';
-import { t } from '@extension/i18n';
+
+type SettingsTab = 'redirector' | 'organizer';
 
 const Options = () => {
   // State management
   const theme = useStorage(exampleThemeStorage);
   const isLight = theme === 'light';
   const urlList = useStorage(weightedUrlsStorage);
-  
+  const [activeTab, setActiveTab] = useState<SettingsTab>('redirector');
+
   const [newUrl, setNewUrl] = useState('');
   const [urlWeight, setUrlWeight] = useState(1);
   const [statusMessage, setStatusMessage] = useState('');
@@ -55,81 +56,110 @@ const Options = () => {
 
   return (
     <div className={`App ${isLight ? '' : 'dark bg-gray-800 text-gray-100'}`}>
-      <div className="container">
-        <h1>New Tab URL Redirector</h1>
-        <p>Configure URLs to open when a new tab is created. One of these URLs will be randomly selected each time.</p>
-        
-        <form className="url-form" onSubmit={handleFormSubmit}>
-          <input 
-            type="text" 
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            placeholder="Enter a URL (e.g., google.com)"
-            className={`${isLight ? '' : 'bg-gray-700 text-white border-gray-600'}`}
-          />
-          <input 
-            type="number" 
-            value={urlWeight}
-            onChange={(e) => setUrlWeight(parseInt(e.target.value) || 1)}
-            placeholder="Weight" 
-            min="1"
-            className={`${isLight ? '' : 'bg-gray-700 text-white border-gray-600'}`}
-          />
-          <button 
-            type="submit" 
-            className={`add-button ${isEditing ? 'bg-blue-500' : 'bg-green-500'}`}
-          >
-            {isEditing ? 'Update URL' : 'Add URL'}
-          </button>
-        </form>
-        
-        <p className="form-tip">
-          <small>To edit an existing entry: Click "Edit" and the entry will be loaded into the form above.</small>
-        </p>
-        
-        <div className="url-list">
-          <h2>Your URLs:</h2>
-          <ul>
-            {urlList && urlList.length > 0 ? (
-              urlList.map((item: WeightedUrl, index: number) => (
-                <li key={`${item.url}-${index}`}>
-                  <span className="url-text">{item.url}</span>
-                  <span className="weight-label">Weight: {item.weight}</span>
-                  
-                  <div className="button-group">
-                    <button 
-                      className="edit-button"
-                      onClick={() => editUrl(item.url, item.weight)}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      className="delete-button"
-                      onClick={() => deleteUrl(item.url)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="empty-message">No URLs added yet</li>
-            )}
-          </ul>
-        </div>
-        
-        <div className="actions">
-          <button className="save-button" onClick={saveUrls}>Save</button>
-          <div id="status">{statusMessage}</div>
-          
-          <button onClick={exampleThemeStorage.toggle}>
-            {isLight ? 'Dark Mode' : 'Light Mode'}
-          </button>
-        </div>
+      <div className="options-layout">
+        <aside className="sidebar">
+          <h2 className="sidebar-title">Settings</h2>
+          <nav>
+            <ul className="tab-list">
+              <li>
+                <button
+                  type="button"
+                  className={`tab-button ${activeTab === 'redirector' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('redirector')}>
+                  Tab Redirector
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`tab-button ${activeTab === 'organizer' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('organizer')}>
+                  Tab Organizer
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </aside>
+
+        <main className="content-area">
+          {activeTab === 'redirector' ? (
+            <div className="container">
+              <h1>New Tab URL Redirector</h1>
+              <p>
+                Configure URLs to open when a new tab is created. One of these URLs will be randomly selected each time.
+              </p>
+
+              <form className="url-form" onSubmit={handleFormSubmit}>
+                <input
+                  type="text"
+                  value={newUrl}
+                  onChange={e => setNewUrl(e.target.value)}
+                  placeholder="Enter a URL (e.g., google.com)"
+                  className={`${isLight ? '' : 'bg-gray-700 text-white border-gray-600'}`}
+                />
+                <input
+                  type="number"
+                  value={urlWeight}
+                  onChange={e => setUrlWeight(parseInt(e.target.value, 10) || 1)}
+                  placeholder="Weight"
+                  min="1"
+                  className={`${isLight ? '' : 'bg-gray-700 text-white border-gray-600'}`}
+                />
+                <button type="submit" className={`add-button ${isEditing ? 'bg-blue-500' : 'bg-green-500'}`}>
+                  {isEditing ? 'Update URL' : 'Add URL'}
+                </button>
+              </form>
+
+              <p className="form-tip">
+                <small>To edit an existing entry: Click "Edit" and the entry will be loaded into the form above.</small>
+              </p>
+
+              <div className="url-list">
+                <h2>Your URLs:</h2>
+                <ul>
+                  {urlList && urlList.length > 0 ? (
+                    urlList.map((item: WeightedUrl, index: number) => (
+                      <li key={`${item.url}-${index}`}>
+                        <span className="url-text">{item.url}</span>
+                        <span className="weight-label">Weight: {item.weight}</span>
+
+                        <div className="button-group">
+                          <button className="edit-button" onClick={() => editUrl(item.url, item.weight)}>
+                            Edit
+                          </button>
+                          <button className="delete-button" onClick={() => deleteUrl(item.url)}>
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="empty-message">No URLs added yet</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="actions">
+                <button className="save-button" onClick={saveUrls}>
+                  Save
+                </button>
+                <div id="status">{statusMessage}</div>
+
+                <button onClick={exampleThemeStorage.toggle}>{isLight ? 'Dark Mode' : 'Light Mode'}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="container tab-placeholder">
+              <h1>Tab Organizer</h1>
+              <p>This section is reserved for upcoming tab organization tools.</p>
+              <p className="placeholder-hint">Stay tuned! Configure everything else from the sidebar.</p>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
-};
+}
 
 export default withErrorBoundary(
   withSuspense(Options, <div className="text-center p-5">Loading...</div>),
