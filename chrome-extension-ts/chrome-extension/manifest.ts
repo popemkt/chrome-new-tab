@@ -61,9 +61,10 @@ const manifest = {
   // 'storage' - Access to chrome.storage API for saving data
   // 'scripting' - Ability to inject scripts into web pages
   // 'tabs' - Access to the browser tabs system
+  // 'tabGroups' - Access to tab groups API for organizing tabs
   // 'notifications' - Ability to show system notifications
   // 'sidePanel' - Access to Chrome's side panel feature
-  permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel'],
+  permissions: ['storage', 'scripting', 'tabs', 'tabGroups', 'notifications', 'sidePanel'],
   
   // ENTRY POINT: Options page HTML file
   // This page is accessed via right-click on extension icon -> Options
