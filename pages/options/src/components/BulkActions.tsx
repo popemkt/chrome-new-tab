@@ -261,8 +261,11 @@ export const BulkActions = () => {
 
             <div className="grid md:grid-cols-3 gap-4 mb-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-foreground mb-2">Search Query</label>
+                <label htmlFor="bulk-search" className="block text-sm font-medium text-foreground mb-2">
+                  Search Query
+                </label>
                 <input
+                  id="bulk-search"
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
@@ -271,8 +274,11 @@ export const BulkActions = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Search In</label>
+                <label htmlFor="bulk-filter-field" className="block text-sm font-medium text-foreground mb-2">
+                  Search In
+                </label>
                 <select
+                  id="bulk-filter-field"
                   value={filterField}
                   onChange={e => setFilterField(e.target.value as FilterField)}
                   className={inputClass}>
@@ -284,8 +290,9 @@ export const BulkActions = () => {
             </div>
 
             <div className="flex gap-3 items-center mb-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label htmlFor="bulk-use-regex" className="flex items-center gap-2 cursor-pointer">
                 <input
+                  id="bulk-use-regex"
                   type="checkbox"
                   checked={useRegex}
                   onChange={e => setUseRegex(e.target.checked)}
@@ -304,8 +311,9 @@ export const BulkActions = () => {
             <div className="bg-card border border-border rounded-lg p-5 mb-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-card-foreground">Results ({filteredTabs.length} tabs)</h3>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label htmlFor="bulk-select-all" className="flex items-center gap-2 cursor-pointer">
                   <input
+                    id="bulk-select-all"
                     type="checkbox"
                     checked={selectAll}
                     onChange={toggleSelectAll}
@@ -415,8 +423,11 @@ export const BulkActions = () => {
               <h3 className="text-base font-semibold mb-3 text-card-foreground">Bulk Rename (Regex)</h3>
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Pattern (Regex)</label>
+                  <label htmlFor="bulk-rename-pattern" className="block text-sm font-medium text-foreground mb-2">
+                    Pattern (Regex)
+                  </label>
                   <input
+                    id="bulk-rename-pattern"
                     type="text"
                     value={renamePattern}
                     onChange={e => setRenamePattern(e.target.value)}
@@ -425,8 +436,11 @@ export const BulkActions = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Replacement</label>
+                  <label htmlFor="bulk-rename-replacement" className="block text-sm font-medium text-foreground mb-2">
+                    Replacement
+                  </label>
                   <input
+                    id="bulk-rename-replacement"
                     type="text"
                     value={renameReplacement}
                     onChange={e => setRenameReplacement(e.target.value)}

@@ -11,8 +11,8 @@ import { resolve } from 'node:path';
 import { withPageConfig } from '@extension/vite-config';
 
 // [GUIDE] Define important directories for this component
-const rootDir = resolve(import.meta.dirname);  // Root of this page package
-const srcDir = resolve(rootDir, 'src');       // Source code directory
+const rootDir = resolve(import.meta.dirname); // Root of this page package
+const srcDir = resolve(rootDir, 'src'); // Source code directory
 
 // [GUIDE] ENTRY POINT FOR VITE BUILD SYSTEM
 // [GUIDE] Vite uses this configuration to:
@@ -35,10 +35,10 @@ export default withPageConfig({
       '@src': srcDir,
     },
   },
-  
+
   // [GUIDE] Static assets directory (images, etc.)
   publicDir: resolve(rootDir, 'public'),
-  
+
   // [GUIDE] Build output configuration
   build: {
     // [GUIDE] IMPORTANT: Output directory where the built files will be placed

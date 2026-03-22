@@ -18,6 +18,7 @@ const TooltipContext = React.createContext<TooltipContextValue>({
   delayDuration: 200,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TooltipProvider = ({ children, delayDuration = 200 }: TooltipProviderProps) => {
   return <>{children}</>;
 };
@@ -71,6 +72,7 @@ interface TooltipContentProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const TooltipContent = React.forwardRef<HTMLDivElement, TooltipContentProps>(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ({ className, side = 'right', sideOffset = 8, children, ...props }, ref) => {
     const { open } = React.useContext(TooltipContext);
 

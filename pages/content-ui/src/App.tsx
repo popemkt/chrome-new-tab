@@ -159,7 +159,10 @@ export default function App() {
     <>
       {/* Backdrop */}
       <div
+        role="button"
+        tabIndex={-1}
         onClick={close}
+        onKeyDown={e => e.key === 'Escape' && close()}
         style={{
           position: 'fixed',
           inset: 0,

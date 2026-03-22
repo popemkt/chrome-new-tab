@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useStorage } from '@extension/shared';
-import { weightedUrlsStorage, WeightedUrl } from '@extension/storage';
+import type { WeightedUrl } from '@extension/storage';
+import { weightedUrlsStorage } from '@extension/storage';
 
 export const TabRedirector = () => {
   const urlList = useStorage(weightedUrlsStorage);

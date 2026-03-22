@@ -129,154 +129,157 @@ export const TabExportImport = () => {
     }
   }, []);
 
-  const importTabs = useCallback(async (file: File) => {
-    setIsImporting(true);
-    setStatusMessage('');
-    setImportProgress(null);
+  const importTabs = useCallback(
+    async (file: File) => {
+      setIsImporting(true);
+      setStatusMessage('');
+      setImportProgress(null);
 
-    try {
-      const text = await file.text();
-      const data: ExportData = JSON.parse(text);
+      try {
+        const text = await file.text();
+        const data: ExportData = JSON.parse(text);
 
-      if (!data.tabs || !Array.isArray(data.tabs)) {
-        throw new Error('Invalid export file format');
-      }
-
-      setImportProgress({ current: 0, total: data.tabs.length });
-
-      // Group tabs by window for organized import
-      const tabsByWindow = new Map<number, ExportedTab[]>();
-      data.tabs.forEach(tab => {
-        if (!tabsByWindow.has(tab.windowId)) {
-          tabsByWindow.set(tab.windowId, []);
-        }
-        tabsByWindow.get(tab.windowId)!.push(tab);
-      });
-
-      // Create a mapping of old group IDs to new group IDs
-      const groupIdMap = new Map<number, number>();
-
-      let importedCount = 0;
-
-      // Process each window
-      for (const [oldWindowId, windowTabs] of tabsByWindow) {
-        // Sort tabs by index to maintain order
-        windowTabs.sort((a, b) => a.index - b.index);
-
-        // Create new window (or use current window for first batch)
-        const isFirstWindow = oldWindowId === Array.from(tabsByWindow.keys())[0];
-        let targetWindowId: number;
-
-        if (isFirstWindow) {
-          // Use current window for first batch
-          const currentWindow = await chrome.windows.getCurrent();
-          targetWindowId = currentWindow.id!;
-        } else {
-          // Create new window for other batches
-          const newWindow = await chrome.windows.create({ focused: false });
-          targetWindowId = newWindow.id!;
+        if (!data.tabs || !Array.isArray(data.tabs)) {
+          throw new Error('Invalid export file format');
         }
 
-        // Recreate groups in this window (if tab groups API is available)
-        if (chrome.tabGroups && typeof chrome.tabGroups.update === 'function') {
-          const windowGroups = data.groups.filter(g => windowTabs.some(t => t.groupId === g.id));
+        setImportProgress({ current: 0, total: data.tabs.length });
 
-          for (const group of windowGroups) {
-            if (!groupIdMap.has(group.id)) {
-              try {
-                // Create a temporary tab to create the group
-                const tempTab = await chrome.tabs.create({
-                  windowId: targetWindowId,
-                  url: 'about:blank',
-                  active: false,
-                });
+        // Group tabs by window for organized import
+        const tabsByWindow = new Map<number, ExportedTab[]>();
+        data.tabs.forEach(tab => {
+          if (!tabsByWindow.has(tab.windowId)) {
+            tabsByWindow.set(tab.windowId, []);
+          }
+          tabsByWindow.get(tab.windowId)!.push(tab);
+        });
 
-                const newGroupId = await chrome.tabs.group({
-                  tabIds: tempTab.id!,
-                });
+        // Create a mapping of old group IDs to new group IDs
+        const groupIdMap = new Map<number, number>();
 
-                await chrome.tabGroups.update(newGroupId, {
-                  title: group.title,
-                  color: group.color,
-                  collapsed: group.collapsed,
-                });
+        let importedCount = 0;
 
-                groupIdMap.set(group.id, newGroupId);
+        // Process each window
+        for (const [oldWindowId, windowTabs] of tabsByWindow) {
+          // Sort tabs by index to maintain order
+          windowTabs.sort((a, b) => a.index - b.index);
 
-                // Remove the temporary tab
-                await chrome.tabs.remove(tempTab.id!);
-              } catch (error) {
-                console.warn(`Error creating group ${group.title}:`, error);
+          // Create new window (or use current window for first batch)
+          const isFirstWindow = oldWindowId === Array.from(tabsByWindow.keys())[0];
+          let targetWindowId: number;
+
+          if (isFirstWindow) {
+            // Use current window for first batch
+            const currentWindow = await chrome.windows.getCurrent();
+            targetWindowId = currentWindow.id!;
+          } else {
+            // Create new window for other batches
+            const newWindow = await chrome.windows.create({ focused: false });
+            targetWindowId = newWindow.id!;
+          }
+
+          // Recreate groups in this window (if tab groups API is available)
+          if (chrome.tabGroups && typeof chrome.tabGroups.update === 'function') {
+            const windowGroups = data.groups.filter(g => windowTabs.some(t => t.groupId === g.id));
+
+            for (const group of windowGroups) {
+              if (!groupIdMap.has(group.id)) {
+                try {
+                  // Create a temporary tab to create the group
+                  const tempTab = await chrome.tabs.create({
+                    windowId: targetWindowId,
+                    url: 'about:blank',
+                    active: false,
+                  });
+
+                  const newGroupId = await chrome.tabs.group({
+                    tabIds: tempTab.id!,
+                  });
+
+                  await chrome.tabGroups.update(newGroupId, {
+                    title: group.title,
+                    color: group.color,
+                    collapsed: group.collapsed,
+                  });
+
+                  groupIdMap.set(group.id, newGroupId);
+
+                  // Remove the temporary tab
+                  await chrome.tabs.remove(tempTab.id!);
+                } catch (error) {
+                  console.warn(`Error creating group ${group.title}:`, error);
+                }
               }
             }
           }
+
+          // Import tabs in batches
+          for (let i = 0; i < windowTabs.length; i += batchSize) {
+            const batch = windowTabs.slice(i, i + batchSize);
+
+            await Promise.all(
+              batch.map(async tab => {
+                try {
+                  // Create tab
+                  const newTab = await chrome.tabs.create({
+                    windowId: targetWindowId,
+                    url: tab.url,
+                    active: false,
+                    pinned: tab.pinned,
+                  });
+
+                  // Add to group if it had one (and groups API is available)
+                  if (tab.groupId !== -1 && groupIdMap.has(tab.groupId) && chrome.tabGroups) {
+                    try {
+                      await chrome.tabs.group({
+                        tabIds: newTab.id!,
+                        groupId: groupIdMap.get(tab.groupId),
+                      });
+                    } catch (error) {
+                      console.warn(`Error adding tab to group:`, error);
+                    }
+                  }
+
+                  // Mute if it was muted
+                  if (tab.mutedInfo?.muted) {
+                    await chrome.tabs.update(newTab.id!, { muted: true });
+                  }
+
+                  // Schedule tab suspension after delay to allow initial load
+                  // This prevents blank tabs while still saving memory
+                  const tabId = newTab.id!;
+                  setTimeout(async () => {
+                    try {
+                      await chrome.tabs.discard(tabId);
+                    } catch (error) {
+                      console.warn(`Error discarding tab ${tab.url}:`, error);
+                    }
+                  }, suspendDelay);
+
+                  importedCount++;
+                  setImportProgress({ current: importedCount, total: data.tabs.length });
+                } catch (error) {
+                  console.error(`Error importing tab ${tab.url}:`, error);
+                }
+              }),
+            );
+
+            // Small delay between batches to prevent overwhelming the browser
+            await new Promise(resolve => setTimeout(resolve, batchDelay));
+          }
         }
 
-        // Import tabs in batches
-        for (let i = 0; i < windowTabs.length; i += batchSize) {
-          const batch = windowTabs.slice(i, i + batchSize);
-
-          await Promise.all(
-            batch.map(async tab => {
-              try {
-                // Create tab
-                const newTab = await chrome.tabs.create({
-                  windowId: targetWindowId,
-                  url: tab.url,
-                  active: false,
-                  pinned: tab.pinned,
-                });
-
-                // Add to group if it had one (and groups API is available)
-                if (tab.groupId !== -1 && groupIdMap.has(tab.groupId) && chrome.tabGroups) {
-                  try {
-                    await chrome.tabs.group({
-                      tabIds: newTab.id!,
-                      groupId: groupIdMap.get(tab.groupId),
-                    });
-                  } catch (error) {
-                    console.warn(`Error adding tab to group:`, error);
-                  }
-                }
-
-                // Mute if it was muted
-                if (tab.mutedInfo?.muted) {
-                  await chrome.tabs.update(newTab.id!, { muted: true });
-                }
-
-                // Schedule tab suspension after delay to allow initial load
-                // This prevents blank tabs while still saving memory
-                const tabId = newTab.id!;
-                setTimeout(async () => {
-                  try {
-                    await chrome.tabs.discard(tabId);
-                  } catch (error) {
-                    console.warn(`Error discarding tab ${tab.url}:`, error);
-                  }
-                }, suspendDelay);
-
-                importedCount++;
-                setImportProgress({ current: importedCount, total: data.tabs.length });
-              } catch (error) {
-                console.error(`Error importing tab ${tab.url}:`, error);
-              }
-            }),
-          );
-
-          // Small delay between batches to prevent overwhelming the browser
-          await new Promise(resolve => setTimeout(resolve, batchDelay));
-        }
+        setStatusMessage(`✅ Imported ${importedCount} tabs successfully! Tabs are in suspended state to save memory.`);
+      } catch (error) {
+        console.error('Error importing tabs:', error);
+        setStatusMessage('❌ Error importing tabs. Check console for details.');
+      } finally {
+        setIsImporting(false);
+        setImportProgress(null);
       }
-
-      setStatusMessage(`✅ Imported ${importedCount} tabs successfully! Tabs are in suspended state to save memory.`);
-    } catch (error) {
-      console.error('Error importing tabs:', error);
-      setStatusMessage('❌ Error importing tabs. Check console for details.');
-    } finally {
-      setIsImporting(false);
-      setImportProgress(null);
-    }
-  }, []);
+    },
+    [batchSize, batchDelay, suspendDelay],
+  );
 
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,8 +329,11 @@ export const TabExportImport = () => {
           {/* Import Settings */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Batch Size</label>
+              <label htmlFor="import-batch-size" className="block text-xs font-medium text-foreground mb-1">
+                Batch Size
+              </label>
               <input
+                id="import-batch-size"
                 type="number"
                 min="1"
                 max="50"
@@ -339,8 +345,11 @@ export const TabExportImport = () => {
               <p className="text-xs text-muted-foreground mt-1">Tabs per batch</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Batch Delay (ms)</label>
+              <label htmlFor="import-batch-delay" className="block text-xs font-medium text-foreground mb-1">
+                Batch Delay (ms)
+              </label>
               <input
+                id="import-batch-delay"
                 type="number"
                 min="0"
                 max="5000"
@@ -353,8 +362,11 @@ export const TabExportImport = () => {
               <p className="text-xs text-muted-foreground mt-1">Between batches</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Suspend Delay (s)</label>
+              <label htmlFor="import-suspend-delay" className="block text-xs font-medium text-foreground mb-1">
+                Suspend Delay (s)
+              </label>
               <input
+                id="import-suspend-delay"
                 type="number"
                 min="0"
                 max="60"
