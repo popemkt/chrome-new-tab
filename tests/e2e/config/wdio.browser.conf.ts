@@ -19,6 +19,7 @@ const chromeCapabilities = {
       '--disable-gpu',
       '--no-sandbox',
       '--disable-dev-shm-usage',
+      '--disable-software-rasterizer',
       // Note: --headless does not support extensions. Use xvfb in CI instead.
     ],
     prefs: { 'extensions.ui.developer_mode': true },
@@ -38,7 +39,8 @@ export const config: WebdriverIO.Config = {
   ...baseConfig,
   capabilities: IS_FIREFOX ? [firefoxCapabilities] : [chromeCapabilities],
 
-  maxInstances: IS_CI ? 10 : 1,
+  // Use fewer instances in CI with xvfb to avoid resource contention
+  maxInstances: IS_CI ? 3 : 1,
   logLevel: 'error',
   execArgv: IS_CI ? [] : ['--inspect'],
   before: async ({ browserName }: WebdriverIO.Capabilities, _specs, browser: WebdriverIO.Browser) => {

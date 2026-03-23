@@ -22,7 +22,8 @@
       "cache": true
     },
     "e2e": {
-      "cache": false
+      "cache": false,
+      "env": ["CEB_CI"]
     },
     "type-check": {
       "dependsOn": ["ready"],
