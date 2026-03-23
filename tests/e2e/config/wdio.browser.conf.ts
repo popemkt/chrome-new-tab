@@ -19,7 +19,7 @@ const chromeCapabilities = {
       '--disable-gpu',
       '--no-sandbox',
       '--disable-dev-shm-usage',
-      ...(IS_CI ? ['--headless'] : []),
+      ...(IS_CI ? ['--headless=new'] : []),
     ],
     prefs: { 'extensions.ui.developer_mode': true },
     extensions: [bundledExtension],

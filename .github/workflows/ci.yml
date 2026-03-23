@@ -82,18 +82,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm zip
-        env:
-          IS_CI: true
+      # Download pre-built dist from build job
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: dist/
 
-      - run: pnpm e2e
+      # Zip the pre-built dist (skip rebuild)
+      - run: pnpm -F zipper zip
+
+      # Run e2e tests directly (skip zip step which would rebuild)
+      - run: turbo e2e
         env:
-          IS_CI: true
+          CEB_CI: "true"
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: e2e-results
-          path: |
-            tests/e2e/logs/
+          path: tests/e2e/logs/
           retention-days: 7
