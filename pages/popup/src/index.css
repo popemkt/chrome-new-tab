@@ -1,0 +1,7 @@
+@import "../../../packages/ui/lib/global.css";
+
+body {
+  width: 300px;
+  height: 260px;
+  position: relative;
+}
