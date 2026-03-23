@@ -82,16 +82,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Download pre-built dist from build job
-      - uses: actions/download-artifact@v4
-        with:
-          name: extension-dist
-          path: dist/
+      # Build, zip, and run e2e
+      - run: pnpm zip
+        env:
+          CEB_CI: "true"
 
-      # Zip the pre-built dist (skip rebuild)
-      - run: pnpm -F zipper zip
-
-      # Run e2e tests directly (skip zip step which would rebuild)
       - run: turbo e2e
         env:
           CEB_CI: "true"
