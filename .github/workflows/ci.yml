@@ -87,7 +87,7 @@ jobs:
         env:
           CEB_CI: "true"
 
-      - run: turbo e2e
+      - run: pnpm exec turbo e2e
         env:
           CEB_CI: "true"
 
