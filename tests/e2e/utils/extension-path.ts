@@ -1,62 +1,25 @@
 /**
- * Returns the Chrome extension path by extracting the ID from the service worker URL.
- * Falls back to chrome://extensions shadow DOM parsing if service worker approach fails.
+ * Returns the Chrome extension path by navigating to chrome://extensions
+ * and extracting the extension ID from the shadow DOM.
  */
 export const getChromeExtensionPath = async (browser: WebdriverIO.Browser) => {
-  // Approach 1: Try getting extension ID from service workers page
-  try {
-    await browser.url('chrome://serviceworker-internals/');
-    await browser.pause(1000);
+  await browser.url('chrome://extensions/');
+  await browser.pause(1000);
 
-    const pageSource = await browser.getPageSource();
-    const match = pageSource.match(/chrome-extension:\/\/([a-z]{32})/);
-    if (match) {
-      return `chrome-extension://${match[1]}`;
-    }
-  } catch {
-    // fall through
+  const extensionId = await browser.execute(() => {
+    const manager = document.querySelector('extensions-manager');
+    if (!manager?.shadowRoot) return null;
+    const itemList = manager.shadowRoot.querySelector('extensions-item-list');
+    if (!itemList?.shadowRoot) return null;
+    const item = itemList.shadowRoot.querySelector('extensions-item');
+    return item?.getAttribute('id') ?? null;
+  });
+
+  if (!extensionId) {
+    throw new Error('Extension ID not found on chrome://extensions/');
   }
 
-  // Approach 2: Try the extensions page shadow DOM
-  try {
-    await browser.url('chrome://extensions/');
-    await browser.pause(1000);
-
-    // Try direct element access first
-    const extensionItem = await browser.$('extensions-manager').getElement();
-    const itemList = await extensionItem.shadow$('#container > #viewManager > extensions-item-list');
-    const item = await itemList.shadow$('extensions-item');
-    const extensionId = await item.getAttribute('id');
-
-    if (extensionId) {
-      return `chrome-extension://${extensionId}`;
-    }
-  } catch {
-    // fall through
-  }
-
-  // Approach 3: Use JavaScript to query chrome://extensions
-  try {
-    await browser.url('chrome://extensions/');
-    await browser.pause(1000);
-
-    const extensionId = await browser.execute(() => {
-      const manager = document.querySelector('extensions-manager');
-      if (!manager?.shadowRoot) return null;
-      const itemList = manager.shadowRoot.querySelector('extensions-item-list');
-      if (!itemList?.shadowRoot) return null;
-      const item = itemList.shadowRoot.querySelector('extensions-item');
-      return item?.getAttribute('id') ?? null;
-    });
-
-    if (extensionId) {
-      return `chrome-extension://${extensionId}`;
-    }
-  } catch {
-    // fall through
-  }
-
-  throw new Error('Could not determine extension ID');
+  return `chrome-extension://${extensionId}`;
 };
 
 /**

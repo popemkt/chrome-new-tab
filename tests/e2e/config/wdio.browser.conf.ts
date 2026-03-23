@@ -19,7 +19,7 @@ const chromeCapabilities = {
       '--disable-gpu',
       '--no-sandbox',
       '--disable-dev-shm-usage',
-      ...(IS_CI ? ['--headless'] : []),
+      // Note: --headless does not support extensions. Use xvfb in CI instead.
     ],
     prefs: { 'extensions.ui.developer_mode': true },
     extensions: [bundledExtension],
