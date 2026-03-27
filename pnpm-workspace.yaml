@@ -4,3 +4,4 @@ packages:
   - 'packages/*'
   - 'tests/*'
   - 'raycast-extension'
+  - 'native-host'

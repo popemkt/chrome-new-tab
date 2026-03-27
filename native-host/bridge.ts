@@ -1,21 +1,24 @@
-#!/usr/bin/env node
-
 /**
- * Native Messaging Host + HTTP Server Bridge
+ * WebSocket + HTTP Bridge Server
  *
- * Chrome extension communicates via native messaging (stdin/stdout).
- * Raycast communicates via HTTP on localhost:19816.
+ * Chrome extension connects via WebSocket.
+ * Raycast and other clients connect via HTTP.
+ * Both share port 19816 on localhost.
  *
  * Endpoints:
- *   GET  /health   — bridge status
- *   GET  /commands — current command list
- *   POST /execute  — trigger a command (relayed to Chrome)
+ *   GET  /health           — bridge status
+ *   GET  /commands          — current command list
+ *   POST /execute           — trigger a command (relayed to Chrome via WS)
+ *   GET  /search-bookmarks  — search bookmarks (relayed to Chrome via WS)
+ *
+ * WebSocket: ws://127.0.0.1:19816
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const PORT = 19816;
 const DATA_DIR = path.join(os.homedir(), '.popemkt', 'browser-extension');
@@ -28,6 +31,7 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 
 function log(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
+  process.stderr.write(line);
   try {
     fs.appendFileSync(LOG_FILE, line);
   } catch {
@@ -49,10 +53,10 @@ interface CommandDef {
 let currentCommands: CommandDef[] = [];
 let syncedAt: string | null = null;
 let extensionId: string | null = null;
-let chromeConnected = true;
-let pendingRequests = new Map<string, { resolve: (data: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
+let chromeSocket: WebSocket | null = null;
+const pendingRequests = new Map<string, { resolve: (data: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
 
-// Load cached commands so HTTP has data before Chrome syncs
+// Load cached commands so HTTP has data before Chrome connects
 try {
   if (fs.existsSync(COMMANDS_FILE)) {
     const cached = JSON.parse(fs.readFileSync(COMMANDS_FILE, 'utf8'));
@@ -65,259 +69,235 @@ try {
   /* ignore corrupt cache */
 }
 
-// --- Buffered stdin reader (native messaging protocol) ---
+// --- Send to Chrome via WebSocket ---
 
-interface NativeMessage {
-  type: string;
-  commands?: CommandDef[];
-  extensionId?: string;
-  commandId?: string;
-  result?: unknown;
-}
-
-let stdinBuffer = Buffer.alloc(0);
-let stdinEnded = false;
-const waiters: Array<() => void> = [];
-
-process.stdin.on('data', (chunk: Buffer) => {
-  stdinBuffer = Buffer.concat([stdinBuffer, chunk]);
-  while (waiters.length > 0) waiters.shift()!();
-});
-
-process.stdin.on('end', () => {
-  log('stdin ended (Chrome disconnected)');
-  stdinEnded = true;
-  chromeConnected = false;
-  while (waiters.length > 0) waiters.shift()!();
-});
-
-function waitForData(): Promise<void> {
-  return new Promise(resolve => {
-    if (stdinBuffer.length > 0 || stdinEnded) resolve();
-    else waiters.push(resolve);
-  });
-}
-
-async function readBytes(n: number): Promise<Buffer | null> {
-  while (stdinBuffer.length < n) {
-    if (stdinEnded) return null;
-    await waitForData();
+function sendToChrome(msg: Record<string, unknown>) {
+  if (chromeSocket?.readyState === WebSocket.OPEN) {
+    chromeSocket.send(JSON.stringify(msg));
   }
-  const result = Buffer.from(stdinBuffer.subarray(0, n));
-  stdinBuffer = stdinBuffer.subarray(n);
-  return result;
 }
-
-async function readMessage(): Promise<NativeMessage | null> {
-  const header = await readBytes(4);
-  if (!header) return null;
-
-  const msgLen = header.readUInt32LE(0);
-  if (msgLen === 0) return null;
-
-  const body = await readBytes(msgLen);
-  if (!body) return null;
-
-  return JSON.parse(body.toString('utf8'));
-}
-
-function sendMessage(msg: Record<string, unknown>) {
-  const json = JSON.stringify(msg);
-  const buf = Buffer.from(json, 'utf8');
-  const header = Buffer.alloc(4);
-  header.writeUInt32LE(buf.length, 0);
-  process.stdout.write(header);
-  process.stdout.write(buf);
-}
-
-// --- Request/response to Chrome ---
 
 function requestChrome(msg: Record<string, unknown>, timeoutMs = 5000): Promise<unknown> {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return new Promise((resolve, reject) => {
+    if (!chromeSocket || chromeSocket.readyState !== WebSocket.OPEN) {
+      reject(new Error('Chrome is not connected'));
+      return;
+    }
     const timer = setTimeout(() => {
       pendingRequests.delete(requestId);
       reject(new Error('Timeout waiting for Chrome response'));
     }, timeoutMs);
     pendingRequests.set(requestId, { resolve, timer });
-    sendMessage({ ...msg, requestId });
+    sendToChrome({ ...msg, requestId });
   });
 }
 
-// --- HTTP Server ---
+// --- Handle WebSocket messages from Chrome ---
 
-function startHttpServer(): http.Server {
-  const server = http.createServer((req, res) => {
-    res.setHeader('Content-Type', 'application/json');
+function handleChromeMessage(raw: string) {
+  let msg: Record<string, unknown>;
+  try {
+    msg = JSON.parse(raw);
+  } catch {
+    log(`Invalid JSON from Chrome: ${raw.slice(0, 100)}`);
+    return;
+  }
 
-    if (req.method === 'GET' && req.url === '/health') {
-      res.writeHead(200);
-      res.end(
-        JSON.stringify({
-          ok: true,
-          chromeConnected,
-          commandCount: currentCommands.length,
-          syncedAt,
-          pid: process.pid,
-          uptime: Math.floor(process.uptime()),
-        }),
-      );
-      return;
-    }
+  const type = msg.type as string;
+  log(`WS received: ${type}`);
 
-    if (req.method === 'GET' && req.url === '/commands') {
-      res.writeHead(200);
-      res.end(
-        JSON.stringify({
-          commands: currentCommands,
-          syncedAt,
-          extensionId,
-          chromeConnected,
-        }),
-      );
-      return;
-    }
+  switch (type) {
+    case 'SYNC_COMMANDS': {
+      currentCommands = (msg.commands as CommandDef[]) ?? [];
+      syncedAt = new Date().toISOString();
+      extensionId = (msg.extensionId as string) ?? null;
 
-    if (req.method === 'POST' && req.url === '/execute') {
-      let body = '';
-      req.on('data', (chunk: Buffer) => {
-        body += chunk.toString();
-      });
-      req.on('end', () => {
-        try {
-          const { commandId } = JSON.parse(body);
-          if (!commandId || typeof commandId !== 'string') {
-            res.writeHead(400);
-            res.end(JSON.stringify({ error: 'Missing commandId' }));
-            return;
-          }
-          if (!chromeConnected) {
-            res.writeHead(503);
-            res.end(JSON.stringify({ error: 'Chrome is not connected' }));
-            return;
-          }
-          log(`HTTP execute: ${commandId}`);
-          sendMessage({ type: 'EXECUTE_COMMAND', commandId });
-          res.writeHead(200);
-          res.end(JSON.stringify({ ok: true, commandId }));
-        } catch {
-          res.writeHead(400);
-          res.end(JSON.stringify({ error: 'Invalid JSON body' }));
-        }
-      });
-      return;
-    }
-
-    if (req.method === 'GET' && req.url?.startsWith('/search-bookmarks?')) {
-      const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
-      const query = url.searchParams.get('q') ?? '';
-      if (!query.trim()) {
-        res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Missing query parameter q' }));
-        return;
-      }
-      if (!chromeConnected) {
-        res.writeHead(503);
-        res.end(JSON.stringify({ error: 'Chrome is not connected' }));
-        return;
-      }
-      log(`HTTP search-bookmarks: ${query}`);
-      requestChrome({ type: 'SEARCH_BOOKMARKS', query: query.trim() })
-        .then(data => {
-          res.writeHead(200);
-          res.end(JSON.stringify(data));
-        })
-        .catch(err => {
-          res.writeHead(504);
-          res.end(JSON.stringify({ error: (err as Error).message }));
-        });
-      return;
-    }
-
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Not found' }));
-  });
-
-  server.listen(PORT, '127.0.0.1', () => {
-    log(`HTTP server listening on http://127.0.0.1:${PORT}`);
-  });
-
-  server.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EADDRINUSE') {
-      log(`Port ${PORT} in use — another bridge may be running. HTTP disabled.`);
-    } else {
-      log(`HTTP server error: ${err.message}`);
-    }
-  });
-
-  return server;
-}
-
-// --- Main loop ---
-
-async function main() {
-  const server = startHttpServer();
-
-  fs.writeFileSync(
-    path.join(DATA_DIR, 'bridge.pid'),
-    JSON.stringify({ pid: process.pid, port: PORT, started: new Date().toISOString() }),
-  );
-
-  log('Main loop started, waiting for messages...');
-
-  while (true) {
-    const msg = await readMessage();
-    if (msg === null) {
-      log('No more messages, exiting');
+      const data = { commands: currentCommands, syncedAt, extensionId };
+      fs.writeFileSync(COMMANDS_FILE, JSON.stringify(data, null, 2));
+      log(`Synced ${currentCommands.length} commands`);
+      sendToChrome({ type: 'SYNC_ACK', count: currentCommands.length });
       break;
     }
 
-    log(`Received: ${msg.type}`);
-
-    switch (msg.type) {
-      case 'SYNC_COMMANDS': {
-        currentCommands = msg.commands ?? [];
-        syncedAt = new Date().toISOString();
-        extensionId = msg.extensionId ?? null;
-
-        const data = { commands: currentCommands, syncedAt, extensionId };
-        fs.writeFileSync(COMMANDS_FILE, JSON.stringify(data, null, 2));
-        log(`Synced ${currentCommands.length} commands`);
-        sendMessage({ type: 'SYNC_ACK', count: currentCommands.length });
-        break;
+    case 'RESPONSE': {
+      const requestId = msg.requestId as string | undefined;
+      if (requestId && pendingRequests.has(requestId)) {
+        const pending = pendingRequests.get(requestId)!;
+        clearTimeout(pending.timer);
+        pendingRequests.delete(requestId);
+        pending.resolve(msg.data);
       }
-
-      case 'COMMAND_RESULT': {
-        log('Command result received');
-        break;
-      }
-
-      case 'RESPONSE': {
-        const requestId = msg.requestId as string | undefined;
-        if (requestId && pendingRequests.has(requestId)) {
-          const pending = pendingRequests.get(requestId)!;
-          clearTimeout(pending.timer);
-          pendingRequests.delete(requestId);
-          pending.resolve(msg.data);
-        }
-        break;
-      }
-
-      default:
-        log(`Unknown message type: ${msg.type}`);
-        sendMessage({ type: 'ERROR', message: `Unknown message type: ${msg.type}` });
+      break;
     }
+
+    case 'PING':
+      sendToChrome({ type: 'PONG' });
+      break;
+
+    case 'COMMAND_RESULT':
+      log('Command result received');
+      break;
+
+    default:
+      log(`Unknown message type: ${type}`);
+  }
+}
+
+// --- HTTP + WebSocket Server ---
+
+const server = http.createServer((req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+
+  if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200);
+    res.end(
+      JSON.stringify({
+        ok: true,
+        chromeConnected: chromeSocket?.readyState === WebSocket.OPEN,
+        commandCount: currentCommands.length,
+        syncedAt,
+        pid: process.pid,
+        uptime: Math.floor(process.uptime()),
+      }),
+    );
+    return;
   }
 
+  if (req.method === 'GET' && req.url === '/commands') {
+    res.writeHead(200);
+    res.end(
+      JSON.stringify({
+        commands: currentCommands,
+        syncedAt,
+        extensionId,
+        chromeConnected: chromeSocket?.readyState === WebSocket.OPEN,
+      }),
+    );
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/execute') {
+    let body = '';
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        const { commandId } = JSON.parse(body);
+        if (!commandId || typeof commandId !== 'string') {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Missing commandId' }));
+          return;
+        }
+        if (!chromeSocket || chromeSocket.readyState !== WebSocket.OPEN) {
+          res.writeHead(503);
+          res.end(JSON.stringify({ error: 'Chrome is not connected' }));
+          return;
+        }
+        log(`HTTP execute: ${commandId}`);
+        sendToChrome({ type: 'EXECUTE_COMMAND', commandId });
+        res.writeHead(200);
+        res.end(JSON.stringify({ ok: true, commandId }));
+      } catch {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url?.startsWith('/search-bookmarks?')) {
+    const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+    const query = url.searchParams.get('q') ?? '';
+    if (!query.trim()) {
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Missing query parameter q' }));
+      return;
+    }
+    if (!chromeSocket || chromeSocket.readyState !== WebSocket.OPEN) {
+      res.writeHead(503);
+      res.end(JSON.stringify({ error: 'Chrome is not connected' }));
+      return;
+    }
+    log(`HTTP search-bookmarks: ${query}`);
+    requestChrome({ type: 'SEARCH_BOOKMARKS', query: query.trim() })
+      .then(data => {
+        res.writeHead(200);
+        res.end(JSON.stringify(data));
+      })
+      .catch(err => {
+        res.writeHead(504);
+        res.end(JSON.stringify({ error: (err as Error).message }));
+      });
+    return;
+  }
+
+  res.writeHead(404);
+  res.end(JSON.stringify({ error: 'Not found' }));
+});
+
+// WebSocket server on the same port
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  wss.handleUpgrade(req, socket, head, ws => {
+    wss.emit('connection', ws, req);
+  });
+});
+
+wss.on('connection', ws => {
+  log('Chrome extension connected via WebSocket');
+  chromeSocket = ws;
+
+  ws.on('message', (data: Buffer) => {
+    handleChromeMessage(data.toString('utf8'));
+  });
+
+  ws.on('close', () => {
+    log('Chrome extension disconnected');
+    if (chromeSocket === ws) chromeSocket = null;
+  });
+
+  ws.on('error', err => {
+    log(`WebSocket error: ${err.message}`);
+  });
+});
+
+// --- Start ---
+
+server.listen(PORT, '127.0.0.1', () => {
+  log(`Bridge listening on http://127.0.0.1:${PORT} (HTTP + WebSocket)`);
+  console.log(`Bridge running on http://127.0.0.1:${PORT}`);
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    log(`Port ${PORT} in use — another bridge may be running.`);
+    console.error(`Port ${PORT} in use — another bridge may be running.`);
+    process.exit(1);
+  } else {
+    log(`Server error: ${err.message}`);
+  }
+});
+
+fs.writeFileSync(
+  path.join(DATA_DIR, 'bridge.pid'),
+  JSON.stringify({ pid: process.pid, port: PORT, started: new Date().toISOString() }),
+);
+
+// Clean shutdown
+function shutdown() {
+  log('Shutting down...');
+  wss.clients.forEach(ws => ws.close());
   server.close();
   try {
     fs.unlinkSync(path.join(DATA_DIR, 'bridge.pid'));
   } catch {
     /* ignore */
   }
+  process.exit(0);
 }
 
-main().catch(err => {
-  log(`Fatal: ${(err as Error).message}`);
-  process.exit(1);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

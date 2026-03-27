@@ -76,16 +76,7 @@ const manifest = {
   // 'bookmarks' - Access to bookmarks API for archiving tabs
   // 'notifications' - Ability to show system notifications
   // 'sidePanel' - Access to Chrome's side panel feature
-  permissions: [
-    'storage',
-    'scripting',
-    'tabs',
-    'tabGroups',
-    'bookmarks',
-    'notifications',
-    'sidePanel',
-    'nativeMessaging',
-  ],
+  permissions: ['storage', 'scripting', 'tabs', 'tabGroups', 'bookmarks', 'notifications', 'sidePanel'],
 
   // ENTRY POINT: Options page HTML file
   // This page is accessed via right-click on extension icon -> Options

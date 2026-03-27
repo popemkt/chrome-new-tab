@@ -170,6 +170,16 @@ importers:
         specifier: ^9.5.1
         version: 9.5.1(typescript@5.9.3)(webpack@5.94.0(esbuild@0.25.0))
 
+  native-host:
+    dependencies:
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.5.13
+
   packages/dev-utils:
     devDependencies:
       '@extension/tsconfig':

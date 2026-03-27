@@ -37,8 +37,11 @@
     "set-global-env": "bash bash-scripts/set_global_env.sh",
     "postinstall": "pnpm build:eslint && pnpm copy_env",
     "module-manager": "pnpm -F module-manager start",
+    "bridge": "node --experimental-strip-types native-host/bridge.ts",
+    "dev:bridge": "node --experimental-strip-types native-host/bridge.ts",
+    "dev:raycast": "pnpm -F popemkt-browser-ext dev",
+    "dev:all": "pnpm dev:bridge & pnpm dev:raycast & wait",
     "setup": "pwsh setup.ps1",
-    "setup:native-host": "pwsh native-host/install.ps1",
     "setup:raycast": "pwsh raycast-extension/install.ps1"
   },
   "dependencies": {

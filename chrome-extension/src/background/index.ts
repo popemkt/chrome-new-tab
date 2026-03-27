@@ -7,49 +7,93 @@ import {
   type BookmarkResult,
 } from '@extension/storage';
 
-const NATIVE_HOST_NAME = 'com.popemkt.bridge';
+const BRIDGE_WS_URL = 'ws://127.0.0.1:19816';
+const RECONNECT_DELAY = 5_000;
 
-// --- Native Messaging Bridge ---
+// --- WebSocket Bridge ---
 
-let nativePort: chrome.runtime.Port | null = null;
+let ws: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
 
-function connectNativeHost() {
+function updateBadge(connected: boolean) {
+  chrome.action.setBadgeText({ text: connected ? '' : '!' });
+  chrome.action.setBadgeBackgroundColor({ color: connected ? '#4CAF50' : '#F44336' });
+}
+
+function connectBridge() {
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   try {
-    const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+    ws = new WebSocket(BRIDGE_WS_URL);
 
-    port.onMessage.addListener((msg: { type: string; commandId?: string; query?: string; requestId?: string }) => {
-      if (msg.type === 'EXECUTE_COMMAND' && msg.commandId) {
-        executeCommand(msg.commandId);
-      } else if (msg.type === 'SEARCH_BOOKMARKS' && msg.query) {
-        searchBookmarks(msg.query).then(bookmarks => {
-          port.postMessage({ type: 'RESPONSE', requestId: msg.requestId, data: { bookmarks } });
-        });
-      } else if (msg.type === 'SYNC_ACK') {
-        console.log('Commands synced to native host');
+    ws.onopen = () => {
+      console.log('Bridge connected');
+      updateBadge(true);
+      // Sync commands immediately
+      ws!.send(
+        JSON.stringify({
+          type: 'SYNC_COMMANDS',
+          commands: commandRegistry,
+          extensionId: chrome.runtime.id,
+        }),
+      );
+      // Keep service worker alive with periodic pings (every 20s)
+      if (keepAliveInterval) clearInterval(keepAliveInterval);
+      keepAliveInterval = setInterval(() => {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'PING' }));
+        }
+      }, 20_000);
+    };
+
+    ws.onmessage = event => {
+      let msg: { type: string; commandId?: string; query?: string; requestId?: string };
+      try {
+        msg = JSON.parse(event.data as string);
+      } catch {
+        return;
       }
-    });
 
-    port.onDisconnect.addListener(() => {
-      const err = chrome.runtime.lastError;
-      nativePort = null;
-      if (err) {
-        console.log('Native host:', err.message);
+      switch (msg.type) {
+        case 'EXECUTE_COMMAND':
+          if (msg.commandId) executeCommand(msg.commandId);
+          break;
+        case 'SEARCH_BOOKMARKS':
+          if (msg.query) {
+            searchBookmarks(msg.query).then(bookmarks => {
+              ws?.send(JSON.stringify({ type: 'RESPONSE', requestId: msg.requestId, data: { bookmarks } }));
+            });
+          }
+          break;
+        case 'SYNC_ACK':
+          console.log('Commands synced to bridge');
+          break;
       }
-      // Reconnect after a delay (service worker may have woken up)
-      setTimeout(connectNativeHost, 5_000);
-    });
+    };
 
-    nativePort = port;
+    ws.onclose = () => {
+      console.log('Bridge disconnected');
+      ws = null;
+      if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+      }
+      updateBadge(false);
+      reconnectTimer = setTimeout(connectBridge, RECONNECT_DELAY);
+    };
 
-    // Sync immediately — if the host isn't there, postMessage is a no-op
-    // and onDisconnect will fire and clean up
-    port.postMessage({
-      type: 'SYNC_COMMANDS',
-      commands: commandRegistry,
-      extensionId: chrome.runtime.id,
-    });
+    ws.onerror = () => {
+      // onclose will fire after this
+    };
   } catch {
-    nativePort = null;
+    ws = null;
+    updateBadge(false);
+    reconnectTimer = setTimeout(connectBridge, RECONNECT_DELAY);
   }
 }
 
@@ -79,7 +123,7 @@ async function searchBookmarks(query: string): Promise<BookmarkResult[]> {
   }));
 }
 
-// --- Command execution (shared between message handler and native bridge) ---
+// --- Command execution ---
 
 function executeCommand(commandId: string) {
   switch (commandId) {
@@ -103,11 +147,11 @@ chrome.runtime.onInstalled.addListener(async () => {
   console.log(`Initialized with ${urls.length} URLs`);
 });
 
-// Try to connect native host on startup (silently fails if not installed)
-connectNativeHost();
+// Connect on startup
+connectBridge();
 
 chrome.runtime.onStartup.addListener(() => {
-  connectNativeHost();
+  connectBridge();
 });
 
 // --- Chrome keyboard shortcuts ---
@@ -123,9 +167,10 @@ chrome.commands.onCommand.addListener(async command => {
 
 // --- Message handler for content scripts and extension pages ---
 
-// Ensure native host is connected when handling messages (service worker may have restarted)
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
-  if (!nativePort) connectNativeHost();
+  // Ensure bridge is connected when handling messages (service worker may have restarted)
+  connectBridge();
+
   switch (message.type) {
     case 'OPEN_OPTIONS_PAGE':
       executeCommand('open-options');
