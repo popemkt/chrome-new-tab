@@ -1,4 +1,4 @@
-import { ActionPanel, Action, List, showToast, Toast, Icon } from '@raycast/api';
+import { ActionPanel, Action, List, showToast, Toast, Icon, launchCommand, LaunchType } from '@raycast/api';
 import { useEffect, useState } from 'react';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -6,6 +6,12 @@ import { homedir } from 'os';
 
 const BRIDGE_URL = 'http://127.0.0.1:19816';
 const COMMANDS_FILE = join(homedir(), '.popemkt', 'browser-extension', 'commands.json');
+
+/** Map of command IDs that have dedicated static Raycast commands */
+const STATIC_COMMANDS: Record<string, string> = {
+  'open-options': 'open-options',
+  'search-bookmarks': 'search-bookmarks',
+};
 
 interface CommandDef {
   id: string;
@@ -41,7 +47,7 @@ async function fetchCommands(): Promise<FetchResult> {
       if (existsSync(COMMANDS_FILE)) {
         const data = JSON.parse(readFileSync(COMMANDS_FILE, 'utf8'));
         return {
-          commands: data.commands ?? [],
+          commands: (data.commands ?? []) as CommandDef[],
           syncedAt: data.syncedAt ?? null,
           chromeConnected: false,
           bridgeOnline: false,
@@ -62,7 +68,13 @@ async function fetchCommands(): Promise<FetchResult> {
   }
 }
 
-async function executeCommand(commandId: string) {
+async function runCommand(commandId: string) {
+  const staticName = STATIC_COMMANDS[commandId];
+  if (staticName) {
+    await launchCommand({ name: staticName, type: LaunchType.UserInitiated });
+    return;
+  }
+
   try {
     const res = await fetch(`${BRIDGE_URL}/execute`, {
       method: 'POST',
@@ -133,10 +145,31 @@ export default function RunCommand() {
     );
   }
 
+  const staticCmds = commands.filter(c => c.id in STATIC_COMMANDS);
+  const dynamicCmds = commands.filter(c => !(c.id in STATIC_COMMANDS));
+
   return (
     <List searchBarPlaceholder="Search commands..." isLoading={isLoading}>
-      <List.Section title="Commands" subtitle={getStatusSubtitle(bridgeOnline, chromeConnected, syncedAt)}>
-        {commands.map(cmd => (
+      {staticCmds.length > 0 && (
+        <List.Section title="Extension Commands">
+          {staticCmds.map(cmd => (
+            <List.Item
+              key={cmd.id}
+              icon={getCommandIcon(cmd.id)}
+              title={cmd.label}
+              subtitle={cmd.description}
+              accessories={[{ tag: 'Static' }]}
+              actions={
+                <ActionPanel>
+                  <Action title="Run Command" icon={Icon.Play} onAction={() => runCommand(cmd.id)} />
+                </ActionPanel>
+              }
+            />
+          ))}
+        </List.Section>
+      )}
+      <List.Section title="Dynamic Commands" subtitle={getStatusSubtitle(bridgeOnline, chromeConnected, syncedAt)}>
+        {dynamicCmds.map(cmd => (
           <List.Item
             key={cmd.id}
             icon={getCommandIcon(cmd.id)}
@@ -144,7 +177,7 @@ export default function RunCommand() {
             subtitle={cmd.description}
             actions={
               <ActionPanel>
-                <Action title="Run Command" icon={Icon.Play} onAction={() => executeCommand(cmd.id)} />
+                <Action title="Run Command" icon={Icon.Play} onAction={() => runCommand(cmd.id)} />
               </ActionPanel>
             }
           />

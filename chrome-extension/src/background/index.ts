@@ -1,5 +1,11 @@
 import 'webextension-polyfill';
-import { weightedUrlsStorage, exampleThemeStorage, commandRegistry } from '@extension/storage';
+import {
+  weightedUrlsStorage,
+  exampleThemeStorage,
+  commandRegistry,
+  type ExtensionMessage,
+  type BookmarkResult,
+} from '@extension/storage';
 
 const NATIVE_HOST_NAME = 'com.popemkt.bridge';
 
@@ -11,9 +17,13 @@ function connectNativeHost() {
   try {
     const port = chrome.runtime.connectNative(NATIVE_HOST_NAME);
 
-    port.onMessage.addListener((msg: { type: string; commandId?: string }) => {
+    port.onMessage.addListener((msg: { type: string; commandId?: string; query?: string; requestId?: string }) => {
       if (msg.type === 'EXECUTE_COMMAND' && msg.commandId) {
         executeCommand(msg.commandId);
+      } else if (msg.type === 'SEARCH_BOOKMARKS' && msg.query) {
+        searchBookmarks(msg.query).then(bookmarks => {
+          port.postMessage({ type: 'RESPONSE', requestId: msg.requestId, data: { bookmarks } });
+        });
       } else if (msg.type === 'SYNC_ACK') {
         console.log('Commands synced to native host');
       }
@@ -41,6 +51,32 @@ function connectNativeHost() {
   } catch {
     nativePort = null;
   }
+}
+
+// --- Bookmark search ---
+
+async function searchBookmarks(query: string): Promise<BookmarkResult[]> {
+  const results = await chrome.bookmarks.search(query);
+  const filtered = results.filter(b => b.url).slice(0, 20);
+
+  // Resolve parent folder names in parallel
+  const parentIds = [...new Set(filtered.map(b => b.parentId).filter(Boolean))] as string[];
+  const parents = await Promise.all(
+    parentIds.map(id =>
+      chrome.bookmarks
+        .get(id)
+        .then(r => r[0])
+        .catch(() => null),
+    ),
+  );
+  const folderMap = new Map(parents.filter(Boolean).map(p => [p!.id, p!.title]));
+
+  return filtered.map(b => ({
+    id: b.id,
+    title: b.title,
+    url: b.url!,
+    folder: (b.parentId && folderMap.get(b.parentId)) || undefined,
+  }));
 }
 
 // --- Command execution (shared between message handler and native bridge) ---
@@ -80,7 +116,7 @@ chrome.commands.onCommand.addListener(async command => {
   if (command === 'open-command-palette') {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab?.id) {
-      chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
+      chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' } satisfies ExtensionMessage);
     }
   }
 });
@@ -88,14 +124,22 @@ chrome.commands.onCommand.addListener(async command => {
 // --- Message handler for content scripts and extension pages ---
 
 // Ensure native host is connected when handling messages (service worker may have restarted)
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   if (!nativePort) connectNativeHost();
-  if (message.type === 'OPEN_OPTIONS_PAGE') {
-    executeCommand('open-options');
-    sendResponse({ success: true });
-  } else if (message.type === 'EXECUTE_COMMAND' && message.commandId) {
-    executeCommand(message.commandId);
-    sendResponse({ success: true });
+  switch (message.type) {
+    case 'OPEN_OPTIONS_PAGE':
+      executeCommand('open-options');
+      sendResponse({ success: true });
+      break;
+    case 'EXECUTE_COMMAND':
+      executeCommand(message.commandId);
+      sendResponse({ success: true });
+      break;
+    case 'SEARCH_BOOKMARKS':
+      searchBookmarks(message.query).then(bookmarks => {
+        sendResponse({ bookmarks });
+      });
+      break;
   }
   return true;
 });

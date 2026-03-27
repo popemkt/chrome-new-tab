@@ -53,6 +53,13 @@
     "clean": {
       "dependsOn": ["^clean"],
       "cache": false
+    },
+    "popemkt-browser-ext#build": {
+      "cache": true
+    },
+    "popemkt-browser-ext#dev": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

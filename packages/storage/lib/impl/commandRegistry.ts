@@ -20,4 +20,10 @@ export const commandRegistry: CommandDef[] = [
     description: 'Switch between light and dark mode',
     context: 'background',
   },
+  {
+    id: 'search-bookmarks',
+    label: 'Search Bookmarks',
+    description: 'Search and open browser bookmarks',
+    context: 'content',
+  },
 ];

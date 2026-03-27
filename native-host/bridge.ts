@@ -50,6 +50,7 @@ let currentCommands: CommandDef[] = [];
 let syncedAt: string | null = null;
 let extensionId: string | null = null;
 let chromeConnected = true;
+let pendingRequests = new Map<string, { resolve: (data: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
 
 // Load cached commands so HTTP has data before Chrome syncs
 try {
@@ -129,6 +130,20 @@ function sendMessage(msg: Record<string, unknown>) {
   process.stdout.write(buf);
 }
 
+// --- Request/response to Chrome ---
+
+function requestChrome(msg: Record<string, unknown>, timeoutMs = 5000): Promise<unknown> {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRequests.delete(requestId);
+      reject(new Error('Timeout waiting for Chrome response'));
+    }, timeoutMs);
+    pendingRequests.set(requestId, { resolve, timer });
+    sendMessage({ ...msg, requestId });
+  });
+}
+
 // --- HTTP Server ---
 
 function startHttpServer(): http.Server {
@@ -193,6 +208,32 @@ function startHttpServer(): http.Server {
       return;
     }
 
+    if (req.method === 'GET' && req.url?.startsWith('/search-bookmarks?')) {
+      const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+      const query = url.searchParams.get('q') ?? '';
+      if (!query.trim()) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Missing query parameter q' }));
+        return;
+      }
+      if (!chromeConnected) {
+        res.writeHead(503);
+        res.end(JSON.stringify({ error: 'Chrome is not connected' }));
+        return;
+      }
+      log(`HTTP search-bookmarks: ${query}`);
+      requestChrome({ type: 'SEARCH_BOOKMARKS', query: query.trim() })
+        .then(data => {
+          res.writeHead(200);
+          res.end(JSON.stringify(data));
+        })
+        .catch(err => {
+          res.writeHead(504);
+          res.end(JSON.stringify({ error: (err as Error).message }));
+        });
+      return;
+    }
+
     res.writeHead(404);
     res.end(JSON.stringify({ error: 'Not found' }));
   });
@@ -248,6 +289,17 @@ async function main() {
 
       case 'COMMAND_RESULT': {
         log('Command result received');
+        break;
+      }
+
+      case 'RESPONSE': {
+        const requestId = msg.requestId as string | undefined;
+        if (requestId && pendingRequests.has(requestId)) {
+          const pending = pendingRequests.get(requestId)!;
+          clearTimeout(pending.timer);
+          pendingRequests.delete(requestId);
+          pending.resolve(msg.data);
+        }
         break;
       }
 

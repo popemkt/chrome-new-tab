@@ -1,14 +1,60 @@
+import { useCallback, useEffect, useState } from 'react';
 import { useStorage } from '@extension/shared';
-import { exampleThemeStorage, themePresetStorage, themePresets, type ThemePresetName } from '@extension/storage';
+import {
+  exampleThemeStorage,
+  themePresetStorage,
+  themePresets,
+  commandPaletteShortcutStorage,
+  DEFAULT_SHORTCUT,
+  type ThemePresetName,
+  type ShortcutConfig,
+} from '@extension/storage';
+
+function formatShortcut(config: ShortcutConfig): string {
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const parts: string[] = [];
+  if (config.ctrlOrMeta) parts.push(isMac ? 'Cmd' : 'Ctrl');
+  if (config.alt) parts.push('Alt');
+  if (config.shift) parts.push('Shift');
+  parts.push(config.key.length === 1 ? config.key.toUpperCase() : config.key);
+  return parts.join(' + ');
+}
 
 export const Settings = () => {
   const theme = useStorage(exampleThemeStorage);
   const activePreset = useStorage(themePresetStorage);
+  const shortcut = useStorage(commandPaletteShortcutStorage) as ShortcutConfig;
   const isLight = theme === 'light';
+
+  const [recording, setRecording] = useState(false);
 
   const handlePresetChange = async (name: ThemePresetName) => {
     await themePresetStorage.setPreset(name);
   };
+
+  const handleRecord = useCallback((e: KeyboardEvent) => {
+    // Ignore lone modifier keys
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const config: ShortcutConfig = {
+      key: e.key.length === 1 ? e.key.toLowerCase() : e.key,
+      ctrlOrMeta: e.ctrlKey || e.metaKey,
+      shift: e.shiftKey,
+      alt: e.altKey,
+    };
+
+    commandPaletteShortcutStorage.setShortcut(config);
+    setRecording(false);
+  }, []);
+
+  useEffect(() => {
+    if (!recording) return;
+    document.addEventListener('keydown', handleRecord, true);
+    return () => document.removeEventListener('keydown', handleRecord, true);
+  }, [recording, handleRecord]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -98,6 +144,42 @@ export const Settings = () => {
                 </button>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* Keyboard Shortcut Section */}
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-4 text-foreground">Keyboard Shortcut</h2>
+
+        <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+          <div>
+            <div className="font-medium text-card-foreground">Command Palette</div>
+            <div className="text-sm text-muted-foreground">
+              {recording ? 'Press your desired shortcut...' : 'Shortcut to open the command palette'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <kbd
+              className={`px-3 py-1.5 rounded-md border font-mono text-sm ${
+                recording
+                  ? 'border-primary bg-primary/10 text-primary animate-pulse'
+                  : 'border-border bg-secondary text-secondary-foreground'
+              }`}>
+              {recording ? 'Recording...' : shortcut ? formatShortcut(shortcut) : '...'}
+            </kbd>
+            <button
+              onClick={() => setRecording(r => !r)}
+              className="px-3 py-1.5 rounded-md border border-border bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer font-medium text-sm">
+              {recording ? 'Cancel' : 'Change'}
+            </button>
+            {shortcut && JSON.stringify(shortcut) !== JSON.stringify(DEFAULT_SHORTCUT) && (
+              <button
+                onClick={() => commandPaletteShortcutStorage.reset()}
+                className="px-3 py-1.5 rounded-md border border-border bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer font-medium text-sm">
+                Reset
+              </button>
+            )}
           </div>
         </div>
       </section>

@@ -8,6 +8,18 @@
   "license": "MIT",
   "commands": [
     {
+      "name": "open-options",
+      "title": "Open Extension Settings",
+      "description": "Open the extension options page",
+      "mode": "no-view"
+    },
+    {
+      "name": "search-bookmarks",
+      "title": "Search Bookmarks",
+      "description": "Search and open browser bookmarks",
+      "mode": "view"
+    },
+    {
       "name": "run-command",
       "title": "Run Browser Extension Command",
       "description": "Browse and execute Browser Extension extension commands",
