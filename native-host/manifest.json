@@ -1,7 +1,0 @@
-{
-  "name": "com.popemkt.bridge",
-  "description": "Browser Extension - Native Messaging Bridge",
-  "path": "BRIDGE_PATH_PLACEHOLDER",
-  "type": "stdio",
-  "allowed_origins": ["chrome-extension://EXTENSION_ID_PLACEHOLDER/"]
-}
