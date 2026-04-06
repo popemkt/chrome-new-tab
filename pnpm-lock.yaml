@@ -538,6 +538,16 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
+  tests/bridge:
+    dependencies:
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.5.13
+
   tests/e2e:
     devDependencies:
       '@extension/env':
