@@ -1,9 +1,15 @@
 import { WebSocket } from 'ws';
 import type { BridgeUpMessage } from '@extension/protocol';
 import { log } from './logger.ts';
-import { setChromeSocket, sendToChrome, resolvePendingRequest, syncCommands } from './state.ts';
+import { chromeSocket, setChromeSocket, sendToChrome, resolvePendingRequest, syncCommands } from './state.ts';
 
 export function handleConnection(ws: WebSocket) {
+  // Single-client policy: close existing connection before accepting the new one
+  if (chromeSocket && chromeSocket.readyState === WebSocket.OPEN) {
+    log('Closing existing Chrome connection (replaced by new client)');
+    chromeSocket.close(1000, 'Replaced by new connection');
+  }
+
   log('Chrome extension connected via WebSocket');
   setChromeSocket(ws);
 
@@ -13,7 +19,10 @@ export function handleConnection(ws: WebSocket) {
 
   ws.on('close', () => {
     log('Chrome extension disconnected');
-    setChromeSocket(null);
+    // Only clear if this socket is still the active one (avoids race with replacement)
+    if (chromeSocket === ws) {
+      setChromeSocket(null);
+    }
   });
 
   ws.on('error', err => {

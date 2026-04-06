@@ -57,6 +57,10 @@ jobs:
         with:
           chrome-version: stable
 
+      - name: Annotate best-effort status
+        if: always()
+        run: echo "::warning::Full-flow E2E is best-effort — MV3 service workers do not reliably activate on CI runners. Re-evaluate periodically."
+
       - name: Run full flow test
         shell: bash
         run: |
@@ -132,8 +136,7 @@ jobs:
 
             # Debug: check if bridge port is reachable
             echo "Bridge health: $(curl -sf $BRIDGE/health || echo 'unreachable')"
-            curl -sf $BRIDGE/health || true
-            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null || taskkill //F //PID $CHROME_PID 2>/dev/null
             exit 1
           fi
 
@@ -143,7 +146,7 @@ jobs:
           echo "Synced commands: $CMD_COUNT"
           if [ "$CMD_COUNT" -lt 1 ]; then
             echo "No commands synced"
-            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null || taskkill //F //PID $CHROME_PID 2>/dev/null
             exit 1
           fi
 
@@ -159,10 +162,10 @@ jobs:
           echo "Search bookmarks status: $SEARCH_STATUS"
           if [ "$SEARCH_STATUS" != "200" ]; then
             echo "Bookmark search failed with status $SEARCH_STATUS"
-            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null || taskkill //F //PID $CHROME_PID 2>/dev/null
             exit 1
           fi
 
           echo "All full-flow tests passed!"
-          taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
+          kill $CHROME_PID $BRIDGE_PID 2>/dev/null || taskkill //F //PID $CHROME_PID 2>/dev/null
           exit 0
