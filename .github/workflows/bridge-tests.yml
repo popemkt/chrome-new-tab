@@ -66,15 +66,18 @@ jobs:
           sleep 3
 
           # Launch Chrome with extension loaded (Windows has a real display)
+          # --user-data-dir is required on Windows for --remote-debugging-port
+          CHROME_DATA=$(mktemp -d)
           chrome.exe \
             --no-first-run \
             --no-default-browser-check \
+            --user-data-dir="$(cygpath -w "$CHROME_DATA")" \
             --remote-debugging-port=9222 \
             --disable-extensions-except="$(cygpath -w "$PWD/dist")" \
             --load-extension="$(cygpath -w "$PWD/dist")" \
             about:blank &
           CHROME_PID=$!
-          sleep 8
+          sleep 10
 
           # Verify bridge is up
           curl -sf $BRIDGE/health || { echo "Bridge not running"; exit 1; }
