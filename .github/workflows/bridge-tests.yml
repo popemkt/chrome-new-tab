@@ -56,6 +56,10 @@ jobs:
       - name: Run full flow test
         shell: bash
         run: |
+          # Pin to the default port (must match the URL baked into the extension)
+          export BRIDGE_PORT=19816
+          BRIDGE="http://127.0.0.1:${BRIDGE_PORT}"
+
           # Start bridge in background
           node --experimental-strip-types bridge/src/index.ts &
           BRIDGE_PID=$!
@@ -71,8 +75,6 @@ jobs:
             about:blank &
           CHROME_PID=$!
           sleep 8
-
-          BRIDGE=http://127.0.0.1:19816
 
           # Verify bridge is up
           curl -sf $BRIDGE/health || { echo "Bridge not running"; exit 1; }
