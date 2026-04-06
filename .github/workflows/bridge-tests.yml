@@ -55,29 +55,30 @@ jobs:
 
       - name: Run full flow test
         run: |
-          # Start bridge on test port
-          BRIDGE_PORT=19817 node --experimental-strip-types bridge/src/index.ts &
+          # Start bridge on default port (19816) — matches the URL baked into the extension
+          node --experimental-strip-types bridge/src/index.ts &
           BRIDGE_PID=$!
           sleep 2
 
-          # Launch Chrome with extension loaded and remote debugging
-          chrome \
-            --headless=new \
-            --disable-gpu \
+          # Launch Chrome headed via xvfb (headless doesn't support MV3 service workers)
+          xvfb-run --auto-servernum chrome \
             --no-sandbox \
+            --disable-gpu \
             --remote-debugging-port=9222 \
-            --disable-extensions-except=dist \
-            --load-extension=dist \
-            &
+            --disable-extensions-except=$PWD/dist \
+            --load-extension=$PWD/dist \
+            about:blank &
           CHROME_PID=$!
           sleep 5
 
+          BRIDGE=http://127.0.0.1:19816
+
           # Verify bridge is up
-          curl -sf http://127.0.0.1:19817/health || { echo "Bridge not running"; exit 1; }
+          curl -sf $BRIDGE/health || { echo "Bridge not running"; exit 1; }
 
           # Wait for extension to connect (up to 30s)
           for i in $(seq 1 30); do
-            CONNECTED=$(curl -sf http://127.0.0.1:19817/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('chromeConnected', False))")
+            CONNECTED=$(curl -sf $BRIDGE/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('chromeConnected', False))")
             if [ "$CONNECTED" = "True" ]; then
               echo "Extension connected after ${i}s"
               break
@@ -87,12 +88,13 @@ jobs:
 
           if [ "$CONNECTED" != "True" ]; then
             echo "Extension did not connect within 30s"
+            curl -sf $BRIDGE/health || true
             kill $CHROME_PID $BRIDGE_PID 2>/dev/null
             exit 1
           fi
 
           # Test: commands are synced
-          COMMANDS=$(curl -sf http://127.0.0.1:19817/commands)
+          COMMANDS=$(curl -sf $BRIDGE/commands)
           CMD_COUNT=$(echo "$COMMANDS" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('commands', [])))")
           echo "Synced commands: $CMD_COUNT"
           if [ "$CMD_COUNT" -lt 1 ]; then
@@ -102,14 +104,14 @@ jobs:
           fi
 
           # Test: execute a command (toggle-theme)
-          EXEC=$(curl -sf -X POST http://127.0.0.1:19817/execute \
+          EXEC=$(curl -sf -X POST $BRIDGE/execute \
             -H "Content-Type: application/json" \
             -d '{"commandId":"toggle-theme"}')
           echo "Execute result: $EXEC"
           echo "$EXEC" | python3 -c "import sys,json; assert json.load(sys.stdin).get('ok'), 'execute failed'"
 
-          # Test: search bookmarks (just verify the relay works, result may be empty)
-          SEARCH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://127.0.0.1:19817/search-bookmarks?q=test")
+          # Test: search bookmarks (relay roundtrip — result may be empty)
+          SEARCH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$BRIDGE/search-bookmarks?q=test")
           echo "Search bookmarks status: $SEARCH_STATUS"
           if [ "$SEARCH_STATUS" != "200" ]; then
             echo "Bookmark search failed with status $SEARCH_STATUS"
@@ -118,7 +120,5 @@ jobs:
           fi
 
           echo "All full-flow tests passed!"
-
-          # Cleanup
           kill $CHROME_PID $BRIDGE_PID 2>/dev/null
           exit 0
