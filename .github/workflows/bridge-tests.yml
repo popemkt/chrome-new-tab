@@ -1,0 +1,124 @@
+name: Bridge Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: bridge-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bridge-relay:
+    name: Bridge Relay Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run bridge tests
+        run: pnpm test:bridge
+
+  full-flow:
+    name: Full Flow E2E
+    needs: bridge-relay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Run full flow test
+        run: |
+          # Start bridge on test port
+          BRIDGE_PORT=19817 node --experimental-strip-types bridge/src/index.ts &
+          BRIDGE_PID=$!
+          sleep 2
+
+          # Launch Chrome with extension loaded and remote debugging
+          chrome \
+            --headless=new \
+            --disable-gpu \
+            --no-sandbox \
+            --remote-debugging-port=9222 \
+            --disable-extensions-except=dist \
+            --load-extension=dist \
+            &
+          CHROME_PID=$!
+          sleep 5
+
+          # Verify bridge is up
+          curl -sf http://127.0.0.1:19817/health || { echo "Bridge not running"; exit 1; }
+
+          # Wait for extension to connect (up to 30s)
+          for i in $(seq 1 30); do
+            CONNECTED=$(curl -sf http://127.0.0.1:19817/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('chromeConnected', False))")
+            if [ "$CONNECTED" = "True" ]; then
+              echo "Extension connected after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$CONNECTED" != "True" ]; then
+            echo "Extension did not connect within 30s"
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            exit 1
+          fi
+
+          # Test: commands are synced
+          COMMANDS=$(curl -sf http://127.0.0.1:19817/commands)
+          CMD_COUNT=$(echo "$COMMANDS" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('commands', [])))")
+          echo "Synced commands: $CMD_COUNT"
+          if [ "$CMD_COUNT" -lt 1 ]; then
+            echo "No commands synced"
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            exit 1
+          fi
+
+          # Test: execute a command (toggle-theme)
+          EXEC=$(curl -sf -X POST http://127.0.0.1:19817/execute \
+            -H "Content-Type: application/json" \
+            -d '{"commandId":"toggle-theme"}')
+          echo "Execute result: $EXEC"
+          echo "$EXEC" | python3 -c "import sys,json; assert json.load(sys.stdin).get('ok'), 'execute failed'"
+
+          # Test: search bookmarks (just verify the relay works, result may be empty)
+          SEARCH_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "http://127.0.0.1:19817/search-bookmarks?q=test")
+          echo "Search bookmarks status: $SEARCH_STATUS"
+          if [ "$SEARCH_STATUS" != "200" ]; then
+            echo "Bookmark search failed with status $SEARCH_STATUS"
+            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            exit 1
+          fi
+
+          echo "All full-flow tests passed!"
+
+          # Cleanup
+          kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+          exit 0
