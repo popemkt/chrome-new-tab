@@ -82,9 +82,22 @@ jobs:
           # Verify bridge is up
           curl -sf $BRIDGE/health || { echo "Bridge not running"; exit 1; }
 
-          # Wait for extension to connect (up to 30s)
+          # Poke CDP to check if extension loaded, and list targets for debug
+          echo "CDP targets:"
+          curl -sf http://127.0.0.1:9222/json 2>/dev/null | python3 -c "
+          import sys,json
+          targets = json.load(sys.stdin)
+          for t in targets:
+              print(f'  [{t[\"type\"]}] {t[\"url\"][:80]}')
+          " || echo "  (CDP not available)"
+
+          # Navigate to a page to help activate the service worker
+          curl -sf http://127.0.0.1:9222/json/new?about:blank > /dev/null 2>&1 || true
+          sleep 3
+
+          # Wait for extension to connect (up to 45s)
           CONNECTED=False
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             CONNECTED=$(curl -sf $BRIDGE/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('chromeConnected', False))")
             if [ "$CONNECTED" = "True" ]; then
               echo "Extension connected after ${i}s"
@@ -94,7 +107,13 @@ jobs:
           done
 
           if [ "$CONNECTED" != "True" ]; then
-            echo "Extension did not connect within 30s"
+            echo "Extension did not connect within 45s"
+            echo "CDP targets at failure:"
+            curl -sf http://127.0.0.1:9222/json 2>/dev/null | python3 -c "
+            import sys,json
+            for t in json.load(sys.stdin):
+                print(f'  [{t[\"type\"]}] {t[\"url\"][:100]}')
+            " || echo "  (CDP not available)"
             curl -sf $BRIDGE/health || true
             taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
             exit 1
