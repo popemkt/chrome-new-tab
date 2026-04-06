@@ -99,9 +99,10 @@ const manifest = {
 
   // ENTRY POINT: New Tab override
   // Replaces Chrome's default new tab page with our custom page
-  chrome_url_overrides: {
-    newtab: 'new-tab/index.html',
-  },
+  // Disabled — not used right now. Uncomment to override Chrome's new tab page
+  // chrome_url_overrides: {
+  //   newtab: 'new-tab/index.html',
+  // },
 
   // Extension icons used in various contexts
   icons: {

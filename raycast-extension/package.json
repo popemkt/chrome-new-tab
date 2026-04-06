@@ -24,6 +24,12 @@
       "title": "Run Browser Extension Command",
       "description": "Browse and execute Browser Extension extension commands",
       "mode": "view"
+    },
+    {
+      "name": "reload-extension",
+      "title": "Reload Browser Extension",
+      "description": "Reload the Chrome/Edge extension via the bridge",
+      "mode": "no-view"
     }
   ],
   "dependencies": {

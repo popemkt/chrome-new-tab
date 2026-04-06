@@ -19,6 +19,8 @@ declare namespace Preferences {
   export type SearchBookmarks = ExtensionPreferences & {};
   /** Preferences accessible in the `run-command` command */
   export type RunCommand = ExtensionPreferences & {};
+  /** Preferences accessible in the `reload-extension` command */
+  export type ReloadExtension = ExtensionPreferences & {};
 }
 
 declare namespace Arguments {
@@ -28,4 +30,6 @@ declare namespace Arguments {
   export type SearchBookmarks = {};
   /** Arguments passed to the `run-command` command */
   export type RunCommand = {};
+  /** Arguments passed to the `reload-extension` command */
+  export type ReloadExtension = {};
 }

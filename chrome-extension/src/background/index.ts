@@ -60,6 +60,10 @@ function connectBridge() {
       }
 
       switch (msg.type) {
+        case 'RELOAD_EXTENSION':
+          console.log('Reloading extension...');
+          chrome.runtime.reload();
+          break;
         case 'EXECUTE_COMMAND':
           if (msg.commandId) executeCommand(msg.commandId);
           break;

@@ -248,20 +248,25 @@ export default function App() {
   // Items for current mode
   const currentItems = mode === 'commands' ? filteredCommands : bookmarks;
 
-  // Handle keyboard navigation inside palette
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+  // Handle keyboard navigation inside palette — capture phase so we beat page handlers
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handler = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
+          e.stopPropagation();
           setSelectedIndex(i => Math.min(i + 1, currentItems.length - 1));
           break;
         case 'ArrowUp':
           e.preventDefault();
+          e.stopPropagation();
           setSelectedIndex(i => Math.max(i - 1, 0));
           break;
         case 'Enter':
           e.preventDefault();
+          e.stopPropagation();
           if (mode === 'commands' && filteredCommands[selectedIndex]) {
             executeCommand(filteredCommands[selectedIndex]);
           } else if (mode === 'bookmarks' && bookmarks[selectedIndex]) {
@@ -270,6 +275,7 @@ export default function App() {
           break;
         case 'Escape':
           e.preventDefault();
+          e.stopPropagation();
           if (mode === 'bookmarks') {
             goBack();
           } else {
@@ -279,24 +285,28 @@ export default function App() {
         case 'Backspace':
           if (mode === 'bookmarks' && query === '') {
             e.preventDefault();
+            e.stopPropagation();
             goBack();
           }
           break;
       }
-    },
-    [
-      currentItems,
-      filteredCommands,
-      bookmarks,
-      selectedIndex,
-      mode,
-      query,
-      executeCommand,
-      openBookmark,
-      close,
-      goBack,
-    ],
-  );
+    };
+
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [
+    isOpen,
+    currentItems,
+    filteredCommands,
+    bookmarks,
+    selectedIndex,
+    mode,
+    query,
+    executeCommand,
+    openBookmark,
+    close,
+    goBack,
+  ]);
 
   // Reset selected index when query changes
   useEffect(() => {
@@ -397,7 +407,6 @@ export default function App() {
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder={mode === 'bookmarks' ? 'Search bookmarks...' : 'Type a command...'}
               style={{
                 flex: 1,
