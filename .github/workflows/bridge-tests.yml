@@ -108,12 +108,26 @@ jobs:
 
           if [ "$CONNECTED" != "True" ]; then
             echo "Extension did not connect within 45s"
+
+            # Debug: dump CDP targets
             echo "CDP targets at failure:"
-            curl -sf http://127.0.0.1:9222/json 2>/dev/null | python3 -c "
+            curl -sf http://127.0.0.1:9222/json 2>/dev/null | python3 -c "import sys,json; [print(f'  [{t[\"type\"]}] {t[\"url\"][:100]}') for t in json.load(sys.stdin)]" || true
+
+            # Debug: try to read service worker console via CDP
+            echo "Attempting to read extension console..."
+            SW_WS=$(curl -sf http://127.0.0.1:9222/json 2>/dev/null | python3 -c "
             import sys,json
             for t in json.load(sys.stdin):
-                print(f'  [{t[\"type\"]}] {t[\"url\"][:100]}')
-            " || echo "  (CDP not available)"
+                if 'chrome-extension' in t.get('url',''):
+                    print(t.get('webSocketDebuggerUrl',''))
+                    break
+            " 2>/dev/null)
+            if [ -n "$SW_WS" ]; then
+              echo "  Extension target WS: $SW_WS"
+            fi
+
+            # Debug: check if bridge port is reachable
+            echo "Bridge health: $(curl -sf $BRIDGE/health || echo 'unreachable')"
             curl -sf $BRIDGE/health || true
             taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
             exit 1
