@@ -32,11 +32,7 @@ jobs:
   full-flow:
     name: Full Flow E2E
     needs: bridge-relay
-    runs-on: ubuntu-latest
-    # MV3 service workers don't reliably activate in headless/xvfb Chrome on Linux.
-    # This test is best-effort — it validates the CI setup works, but the extension
-    # may not connect. Bridge relay tests above cover the core relay logic.
-    continue-on-error: true
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -58,22 +54,23 @@ jobs:
           chrome-version: stable
 
       - name: Run full flow test
+        shell: bash
         run: |
-          # Start bridge on default port (19816) — matches the URL baked into the extension
+          # Start bridge in background
           node --experimental-strip-types bridge/src/index.ts &
           BRIDGE_PID=$!
-          sleep 2
+          sleep 3
 
-          # Launch Chrome headed via xvfb (headless doesn't support MV3 service workers)
-          xvfb-run --auto-servernum chrome \
-            --no-sandbox \
-            --disable-gpu \
+          # Launch Chrome with extension loaded (Windows has a real display)
+          chrome.exe \
+            --no-first-run \
+            --no-default-browser-check \
             --remote-debugging-port=9222 \
-            --disable-extensions-except=$PWD/dist \
-            --load-extension=$PWD/dist \
+            --disable-extensions-except="$(cygpath -w "$PWD/dist")" \
+            --load-extension="$(cygpath -w "$PWD/dist")" \
             about:blank &
           CHROME_PID=$!
-          sleep 5
+          sleep 8
 
           BRIDGE=http://127.0.0.1:19816
 
@@ -81,6 +78,7 @@ jobs:
           curl -sf $BRIDGE/health || { echo "Bridge not running"; exit 1; }
 
           # Wait for extension to connect (up to 30s)
+          CONNECTED=False
           for i in $(seq 1 30); do
             CONNECTED=$(curl -sf $BRIDGE/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('chromeConnected', False))")
             if [ "$CONNECTED" = "True" ]; then
@@ -93,7 +91,7 @@ jobs:
           if [ "$CONNECTED" != "True" ]; then
             echo "Extension did not connect within 30s"
             curl -sf $BRIDGE/health || true
-            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
             exit 1
           fi
 
@@ -103,7 +101,7 @@ jobs:
           echo "Synced commands: $CMD_COUNT"
           if [ "$CMD_COUNT" -lt 1 ]; then
             echo "No commands synced"
-            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
             exit 1
           fi
 
@@ -119,10 +117,10 @@ jobs:
           echo "Search bookmarks status: $SEARCH_STATUS"
           if [ "$SEARCH_STATUS" != "200" ]; then
             echo "Bookmark search failed with status $SEARCH_STATUS"
-            kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+            taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
             exit 1
           fi
 
           echo "All full-flow tests passed!"
-          kill $CHROME_PID $BRIDGE_PID 2>/dev/null
+          taskkill //F //PID $CHROME_PID 2>/dev/null; kill $BRIDGE_PID 2>/dev/null
           exit 0
