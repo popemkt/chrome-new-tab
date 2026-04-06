@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws';
+import type { BridgeUpMessage } from '@extension/protocol';
 import { log } from './logger.ts';
-import { setChromeSocket, sendToChrome, resolvePendingRequest, syncCommands, type CommandDef } from './state.ts';
+import { setChromeSocket, sendToChrome, resolvePendingRequest, syncCommands } from './state.ts';
 
 export function handleConnection(ws: WebSocket) {
   log('Chrome extension connected via WebSocket');
@@ -21,7 +22,7 @@ export function handleConnection(ws: WebSocket) {
 }
 
 function handleMessage(raw: string) {
-  let msg: Record<string, unknown>;
+  let msg: BridgeUpMessage;
   try {
     msg = JSON.parse(raw);
   } catch {
@@ -29,20 +30,17 @@ function handleMessage(raw: string) {
     return;
   }
 
-  const type = msg.type as string;
-  log(`WS received: ${type}`);
+  log(`WS received: ${msg.type}`);
 
-  switch (type) {
+  switch (msg.type) {
     case 'SYNC_COMMANDS':
-      syncCommands((msg.commands as CommandDef[]) ?? [], (msg.extensionId as string) ?? null);
-      sendToChrome({ type: 'SYNC_ACK', count: ((msg.commands as CommandDef[]) ?? []).length });
+      syncCommands(msg.commands, msg.extensionId);
+      sendToChrome({ type: 'SYNC_ACK', count: msg.commands.length });
       break;
 
-    case 'RESPONSE': {
-      const requestId = msg.requestId as string | undefined;
-      if (requestId) resolvePendingRequest(requestId, msg.data);
+    case 'RESPONSE':
+      resolvePendingRequest(msg.requestId, msg.data);
       break;
-    }
 
     case 'PING':
       sendToChrome({ type: 'PONG' });
@@ -51,8 +49,5 @@ function handleMessage(raw: string) {
     case 'COMMAND_RESULT':
       log('Command result received');
       break;
-
-    default:
-      log(`Unknown message type: ${type}`);
   }
 }

@@ -10,7 +10,8 @@
  *   GET  /commands            — current command list
  *   POST /execute             — trigger a command (relayed to Chrome via WS)
  *   GET  /search-bookmarks    — search bookmarks (relayed to Chrome via WS)
- *   POST /reload-extension    — reload the Chrome extension
+ *   POST /reload-extension    — reload extension via CDP (falls back to WS)
+ *   POST /dev/build            — build the extension from source
  *
  * WebSocket: ws://127.0.0.1:19816
  */
@@ -18,7 +19,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
-import { PORT, DATA_DIR, PID_FILE } from './config.ts';
+import { BRIDGE_PORT, DATA_DIR, PID_FILE } from './config.ts';
 import { log } from './logger.ts';
 import { handleRequest } from './routes.ts';
 import { handleConnection } from './websocket.ts';
@@ -45,22 +46,22 @@ wss.on('connection', handleConnection);
 
 // --- Start ---
 
-server.listen(PORT, '127.0.0.1', () => {
-  log(`Bridge listening on http://127.0.0.1:${PORT} (HTTP + WebSocket)`);
-  console.log(`Bridge running on http://127.0.0.1:${PORT}`);
+server.listen(BRIDGE_PORT, '127.0.0.1', () => {
+  log(`Bridge listening on http://127.0.0.1:${BRIDGE_PORT} (HTTP + WebSocket)`);
+  console.log(`Bridge running on http://127.0.0.1:${BRIDGE_PORT}`);
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    log(`Port ${PORT} in use — another bridge may be running.`);
-    console.error(`Port ${PORT} in use — another bridge may be running.`);
+    log(`Port ${BRIDGE_PORT} in use — another bridge may be running.`);
+    console.error(`Port ${BRIDGE_PORT} in use — another bridge may be running.`);
     process.exit(1);
   } else {
     log(`Server error: ${err.message}`);
   }
 });
 
-fs.writeFileSync(PID_FILE, JSON.stringify({ pid: process.pid, port: PORT, started: new Date().toISOString() }));
+fs.writeFileSync(PID_FILE, JSON.stringify({ pid: process.pid, port: BRIDGE_PORT, started: new Date().toISOString() }));
 
 // --- Clean shutdown ---
 

@@ -27,13 +27,26 @@
     },
     {
       "name": "reload-extension",
-      "title": "Reload Browser Extension",
+      "title": "Dev: Reload Extension",
       "description": "Reload the Chrome/Edge extension via the bridge",
+      "mode": "no-view"
+    },
+    {
+      "name": "build-extension",
+      "title": "Dev: Build Extension",
+      "description": "Build the Chrome extension from source",
+      "mode": "no-view"
+    },
+    {
+      "name": "build-and-reload",
+      "title": "Dev: Build & Reload Extension",
+      "description": "Build the extension then reload it in the browser",
       "mode": "no-view"
     }
   ],
   "dependencies": {
-    "@raycast/api": "^1.83.0"
+    "@raycast/api": "^1.83.0",
+    "@extension/protocol": "workspace:*"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.11",

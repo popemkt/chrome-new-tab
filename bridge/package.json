@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@extension/protocol": "workspace:*",
     "ws": "^8.18.0"
   },
   "devDependencies": {

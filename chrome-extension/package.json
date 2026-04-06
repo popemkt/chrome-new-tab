@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@extension/env": "workspace:*",
+    "@extension/protocol": "workspace:*",
     "@extension/shared": "workspace:*",
     "@extension/storage": "workspace:*",
     "vite-plugin-node-polyfills": "^0.23.0",

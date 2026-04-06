@@ -1,8 +1,10 @@
 import http from 'node:http';
+import { exec } from 'node:child_process';
 import { WebSocket } from 'ws';
-import { PORT } from './config.ts';
+import { BRIDGE_PORT, PROJECT_ROOT } from './config.ts';
 import { log } from './logger.ts';
 import { commands, syncedAt, extensionId, chromeSocket, sendToChrome, requestChrome } from './state.ts';
+import { reloadExtensionViaCDP } from './devtools.ts';
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise(resolve => {
@@ -63,14 +65,34 @@ export async function handleRequest(req: http.IncomingMessage, res: http.ServerR
   }
 
   if (method === 'POST' && url === '/reload-extension') {
-    if (!requireChrome(res)) return;
+    if (!extensionId) return json(res, 400, { error: 'Extension ID not known yet (has it connected?)' });
     log('HTTP reload-extension');
-    sendToChrome({ type: 'RELOAD_EXTENSION' });
-    return json(res, 200, { ok: true });
+    try {
+      await reloadExtensionViaCDP(extensionId);
+      return json(res, 200, { ok: true, method: 'cdp' });
+    } catch (err) {
+      log(`CDP reload failed: ${(err as Error).message}, falling back to WS`);
+      if (!requireChrome(res)) return;
+      sendToChrome({ type: 'RELOAD_EXTENSION' });
+      return json(res, 200, { ok: true, method: 'websocket-fallback' });
+    }
+  }
+
+  if (method === 'POST' && url === '/dev/build') {
+    log('HTTP dev/build');
+    exec('pnpm build', { cwd: PROJECT_ROOT }, (err, stdout, stderr) => {
+      if (err) {
+        log(`Build failed: ${stderr}`);
+        return json(res, 500, { error: 'Build failed', details: stderr });
+      }
+      log('Build succeeded');
+      json(res, 200, { ok: true, output: stdout });
+    });
+    return;
   }
 
   if (method === 'GET' && url?.startsWith('/search-bookmarks?')) {
-    const parsed = new URL(url, `http://127.0.0.1:${PORT}`);
+    const parsed = new URL(url, `http://127.0.0.1:${BRIDGE_PORT}`);
     const query = parsed.searchParams.get('q') ?? '';
     if (!query.trim()) return json(res, 400, { error: 'Missing query parameter q' });
     if (!requireChrome(res)) return;

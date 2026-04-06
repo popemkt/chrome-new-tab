@@ -1,7 +1,6 @@
 import { ActionPanel, Action, List, showToast, Toast, Icon, Image } from '@raycast/api';
 import { useState, useEffect, useRef } from 'react';
-
-const BRIDGE_URL = 'http://127.0.0.1:19816';
+import { BRIDGE_HTTP_URL, type BookmarkResult } from '@extension/protocol';
 
 function faviconUrl(pageUrl: string): string {
   try {
@@ -10,13 +9,6 @@ function faviconUrl(pageUrl: string): string {
   } catch {
     return '';
   }
-}
-
-interface BookmarkResult {
-  id: string;
-  title: string;
-  url: string;
-  folder?: string;
 }
 
 export default function SearchBookmarks() {
@@ -37,7 +29,7 @@ export default function SearchBookmarks() {
       abortRef.current = controller;
 
       setIsLoading(true);
-      fetch(`${BRIDGE_URL}/search-bookmarks?q=${encodeURIComponent(query.trim())}`, {
+      fetch(`${BRIDGE_HTTP_URL}/search-bookmarks?q=${encodeURIComponent(query.trim())}`, {
         signal: controller.signal,
       })
         .then(res => {

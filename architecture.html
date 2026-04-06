@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture — Browser Extension Bridge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f13;
+    color: #e0e0e6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    text-align: center;
+    padding: 32px 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+
+  /* ---- Canvas ---- */
+  .canvas {
+    position: relative;
+    width: 960px;
+    margin: 0 auto;
+    height: 700px;
+  }
+  svg.lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  svg.lines path, svg.lines line {
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+
+  /* ---- Nodes ---- */
+  .node {
+    position: absolute;
+    border-radius: 12px;
+    padding: 18px 22px;
+    min-width: 180px;
+    cursor: default;
+    transition: box-shadow .2s, transform .15s;
+    z-index: 2;
+  }
+  .node:hover { transform: translateY(-2px); }
+  .node h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .node p {
+    font-size: 12px;
+    color: #999;
+    line-height: 1.5;
+  }
+  .node .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-top: 8px;
+    margin-right: 4px;
+    font-weight: 500;
+  }
+
+  /* node themes */
+  .node.protocol {
+    background: #1a1a2e;
+    border: 1.5px solid #3a3a5c;
+    box-shadow: 0 0 24px rgba(100,100,255,.08);
+  }
+  .node.protocol:hover { box-shadow: 0 0 32px rgba(100,100,255,.18); }
+  .node.protocol h3 { color: #a0a0ff; }
+  .node.protocol .tag { background: #2a2a4e; color: #8888cc; }
+
+  .node.bridge {
+    background: #1a2420;
+    border: 1.5px solid #2a5040;
+    box-shadow: 0 0 24px rgba(80,200,120,.08);
+  }
+  .node.bridge:hover { box-shadow: 0 0 32px rgba(80,200,120,.18); }
+  .node.bridge h3 { color: #6fcf97; }
+  .node.bridge .tag { background: #1a3028; color: #5bb880; }
+
+  .node.extension {
+    background: #1e1a28;
+    border: 1.5px solid #4a3a6c;
+    box-shadow: 0 0 24px rgba(160,100,255,.08);
+  }
+  .node.extension:hover { box-shadow: 0 0 32px rgba(160,100,255,.18); }
+  .node.extension h3 { color: #b388ff; }
+  .node.extension .tag { background: #2a2040; color: #9a70dd; }
+
+  .node.raycast {
+    background: #28201a;
+    border: 1.5px solid #6c4a2a;
+    box-shadow: 0 0 24px rgba(255,160,60,.08);
+  }
+  .node.raycast:hover { box-shadow: 0 0 32px rgba(255,160,60,.18); }
+  .node.raycast h3 { color: #ffb86c; }
+  .node.raycast .tag { background: #3a2a1a; color: #cc9050; }
+
+  .node.edge {
+    background: #1a2028;
+    border: 1.5px solid #2a4a6c;
+    box-shadow: 0 0 24px rgba(60,140,255,.08);
+  }
+  .node.edge:hover { box-shadow: 0 0 32px rgba(60,140,255,.18); }
+  .node.edge h3 { color: #64b5f6; }
+  .node.edge .tag { background: #1a2838; color: #5090cc; }
+
+  .node.content {
+    background: #1e1e22;
+    border: 1.5px solid #444;
+    box-shadow: 0 0 24px rgba(200,200,200,.04);
+  }
+  .node.content:hover { box-shadow: 0 0 32px rgba(200,200,200,.1); }
+  .node.content h3 { color: #ccc; }
+  .node.content .tag { background: #2a2a2a; color: #888; }
+
+  /* ---- Connection lines ---- */
+  .conn {
+    stroke-width: 2;
+    fill: none;
+    transition: stroke-width .15s, opacity .15s;
+    opacity: .5;
+  }
+  .conn:hover, .conn.active {
+    stroke-width: 3.5;
+    opacity: 1;
+  }
+  .conn-ws { stroke: #b388ff; stroke-dasharray: 8 4; }
+  .conn-http { stroke: #6fcf97; }
+  .conn-cdp { stroke: #64b5f6; stroke-dasharray: 4 3; }
+  .conn-import { stroke: #5555aa; stroke-dasharray: 2 3; }
+  .conn-internal { stroke: #666; stroke-dasharray: 6 4; }
+
+  marker polygon { transition: fill .15s; }
+
+  /* ---- Detail panel ---- */
+  .detail {
+    position: absolute;
+    z-index: 10;
+    background: #1c1c24;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 16px 20px;
+    width: 320px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .detail.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .detail h4 {
+    font-size: 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .detail .badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .detail ul {
+    list-style: none;
+    padding: 0;
+  }
+  .detail li {
+    padding: 3px 0;
+    color: #aaa;
+  }
+  .detail code {
+    background: #252530;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #ddd;
+  }
+  .detail .direction {
+    color: #666;
+    font-size: 11px;
+    margin-top: 6px;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .detail .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+  .detail .close-btn:hover { color: #aaa; }
+
+  /* ---- Legend ---- */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 16px 0 32px;
+    font-size: 12px;
+    color: #666;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-line {
+    width: 28px;
+    height: 2px;
+    border-radius: 1px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Browser Extension Bridge Architecture</h1>
+<p class="subtitle">Click on any connection line to see what flows through it</p>
+
+<div class="canvas" id="canvas">
+  <svg class="lines" id="svg">
+    <defs>
+      <marker id="arrow-ws" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#b388ff"/>
+      </marker>
+      <marker id="arrow-http" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#6fcf97"/>
+      </marker>
+      <marker id="arrow-cdp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#64b5f6"/>
+      </marker>
+      <marker id="arrow-import" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#5555aa"/>
+      </marker>
+      <marker id="arrow-internal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <!-- Protocol (center bottom) -->
+  <div class="node protocol" id="n-protocol" style="left:370px; top:540px; min-width:220px;">
+    <h3>@extension/protocol</h3>
+    <p>Single source of truth for types,<br>message contracts, and constants</p>
+    <span class="tag">CommandDef</span>
+    <span class="tag">BookmarkResult</span>
+    <span class="tag">BridgeUpMessage</span>
+    <span class="tag">BridgeDownMessage</span>
+    <span class="tag">ExtensionMessage</span>
+    <span class="tag">BRIDGE_PORT</span>
+  </div>
+
+  <!-- Bridge (center) -->
+  <div class="node bridge" id="n-bridge" style="left:370px; top:250px; min-width:220px;">
+    <h3>Bridge Server</h3>
+    <p>HTTP + WebSocket on :19816<br>Relays between all clients</p>
+    <span class="tag">routes.ts</span>
+    <span class="tag">websocket.ts</span>
+    <span class="tag">devtools.ts</span>
+    <span class="tag">state.ts</span>
+  </div>
+
+  <!-- Chrome Extension (top left) -->
+  <div class="node extension" id="n-ext" style="left:40px; top:60px; min-width:210px;">
+    <h3>Chrome Extension</h3>
+    <p>MV3 Service Worker<br>background/index.ts</p>
+    <span class="tag">Bookmarks API</span>
+    <span class="tag">Commands</span>
+    <span class="tag">Keepalive ping</span>
+  </div>
+
+  <!-- Raycast (top right) -->
+  <div class="node raycast" id="n-raycast" style="left:700px; top:60px; min-width:210px;">
+    <h3>Raycast Extension</h3>
+    <p>Desktop commands for<br>browser control</p>
+    <span class="tag">Run Command</span>
+    <span class="tag">Search Bookmarks</span>
+    <span class="tag">Dev: Build & Reload</span>
+  </div>
+
+  <!-- Edge Browser (right middle) -->
+  <div class="node edge" id="n-edge" style="left:720px; top:310px; min-width:180px;">
+    <h3>Edge Browser</h3>
+    <p>CDP on :9222<br>developerPrivate API</p>
+    <span class="tag">Remote Debugging</span>
+  </div>
+
+  <!-- Content Script (left middle) -->
+  <div class="node content" id="n-content" style="left:20px; top:290px; min-width:200px;">
+    <h3>Content Script</h3>
+    <p>Injected into web pages<br>Command Palette UI</p>
+    <span class="tag">Keyboard capture</span>
+    <span class="tag">Shadow DOM</span>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="detail" id="detail">
+    <button class="close-btn" onclick="hideDetail()">&times;</button>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-line" style="background:#b388ff;"></div>
+    WebSocket (bidirectional)
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#6fcf97;"></div>
+    HTTP (request/response)
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#64b5f6;"></div>
+    Chrome DevTools Protocol
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#5555aa;"></div>
+    TypeScript import
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#666;"></div>
+    chrome.runtime internal
+  </div>
+</div>
+
+<script>
+const svg = document.getElementById('svg');
+const detail = document.getElementById('detail');
+const detailContent = document.getElementById('detail-content');
+let activeConn = null;
+
+// Node center helpers
+function center(id) {
+  const el = document.getElementById(id);
+  const r = el.getBoundingClientRect();
+  const c = document.getElementById('canvas').getBoundingClientRect();
+  return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2 };
+}
+
+function edgePoint(id, targetId) {
+  const el = document.getElementById(id);
+  const r = el.getBoundingClientRect();
+  const c = document.getElementById('canvas').getBoundingClientRect();
+  const cx = r.left - c.left + r.width / 2;
+  const cy = r.top - c.top + r.height / 2;
+  const t = center(targetId);
+  const angle = Math.atan2(t.y - cy, t.x - cx);
+  const hw = r.width / 2 + 4;
+  const hh = r.height / 2 + 4;
+  // Find intersection with rectangle
+  const tanA = Math.abs(Math.tan(angle));
+  let ex, ey;
+  if (tanA * hw <= hh) {
+    ex = cx + Math.sign(Math.cos(angle)) * hw;
+    ey = cy + Math.sign(Math.cos(angle)) * hw * Math.tan(angle);
+  } else {
+    ey = cy + Math.sign(Math.sin(angle)) * hh;
+    ex = cx + Math.sign(Math.sin(angle)) * hh / Math.tan(angle);
+  }
+  return { x: ex, y: ey };
+}
+
+// Connection definitions
+const connections = [
+  {
+    id: 'ws-ext-bridge',
+    from: 'n-ext', to: 'n-bridge',
+    type: 'ws',
+    info: {
+      title: 'WebSocket',
+      badge: 'ws', badgeColor: '#b388ff',
+      desc: 'Persistent bidirectional connection. Keeps the MV3 service worker alive with PING/PONG every 20s.',
+      up: [
+        '<code>SYNC_COMMANDS</code> — register available commands',
+        '<code>PING</code> — keepalive (every 20s)',
+        '<code>RESPONSE</code> — reply to bridge requests',
+        '<code>COMMAND_RESULT</code> — execution result',
+      ],
+      down: [
+        '<code>EXECUTE_COMMAND</code> — run a command by ID',
+        '<code>SEARCH_BOOKMARKS</code> — search with query',
+        '<code>RELOAD_EXTENSION</code> — trigger reload',
+        '<code>SYNC_ACK</code> — confirm command sync',
+        '<code>PONG</code> — keepalive reply',
+      ],
+      types: 'Typed as <code>BridgeUpMessage</code> / <code>BridgeDownMessage</code> from <code>@extension/protocol</code>'
+    }
+  },
+  {
+    id: 'http-raycast-bridge',
+    from: 'n-raycast', to: 'n-bridge',
+    type: 'http',
+    info: {
+      title: 'HTTP API',
+      badge: 'http', badgeColor: '#6fcf97',
+      desc: 'Raycast calls bridge endpoints. Bridge relays to the extension via WebSocket when needed.',
+      up: [
+        '<code>GET /health</code> — bridge status & uptime',
+        '<code>GET /commands</code> — list synced commands',
+        '<code>POST /execute</code> — run a command',
+        '<code>GET /search-bookmarks?q=</code> — search bookmarks',
+        '<code>POST /reload-extension</code> — reload via CDP',
+        '<code>POST /dev/build</code> — build from source',
+      ],
+      down: [],
+      types: 'Bridge URL from <code>BRIDGE_HTTP_URL</code> in <code>@extension/protocol</code>'
+    }
+  },
+  {
+    id: 'cdp-bridge-edge',
+    from: 'n-bridge', to: 'n-edge',
+    type: 'cdp',
+    info: {
+      title: 'Chrome DevTools Protocol',
+      badge: 'cdp', badgeColor: '#64b5f6',
+      desc: 'Bridge connects to Edge\'s debug port to trigger a full extension reload (re-reads files from disk).',
+      up: [
+        '<code>GET /json</code> — list CDP targets',
+        '<code>PUT /json/new?chrome://extensions</code> — open extensions page',
+        '<code>Runtime.evaluate</code> — call <code>chrome.developerPrivate.reload()</code>',
+      ],
+      down: [],
+      types: 'Requires Edge launched with <code>--remote-debugging-port=9222</code>'
+    }
+  },
+  {
+    id: 'import-bridge-proto',
+    from: 'n-bridge', to: 'n-protocol',
+    type: 'import',
+    info: {
+      title: 'TypeScript Import',
+      badge: 'import', badgeColor: '#7777cc',
+      desc: 'Bridge imports shared types and constants. No more hardcoded values.',
+      up: [
+        '<code>BRIDGE_PORT</code> — server listen port',
+        '<code>CDP_PORT</code> — Edge debug port',
+        '<code>DATA_DIR_NAME</code> / <code>COMMANDS_FILENAME</code>',
+        '<code>CommandDef</code> — command interface',
+        '<code>BridgeUpMessage</code> — typed WS messages from extension',
+      ],
+      down: [],
+      types: '<code>import { ... } from \'@extension/protocol\'</code>'
+    }
+  },
+  {
+    id: 'import-ext-proto',
+    from: 'n-ext', to: 'n-protocol',
+    type: 'import',
+    info: {
+      title: 'TypeScript Import',
+      badge: 'import', badgeColor: '#7777cc',
+      desc: 'Extension imports bridge WS types and connection URL.',
+      up: [
+        '<code>BRIDGE_WS_URL</code> — WebSocket endpoint',
+        '<code>BridgeDownMessage</code> — typed messages from bridge',
+      ],
+      down: [],
+      types: 'Also gets <code>CommandDef</code>, <code>BookmarkResult</code>, <code>ExtensionMessage</code> via <code>@extension/storage</code> re-exports'
+    }
+  },
+  {
+    id: 'import-raycast-proto',
+    from: 'n-raycast', to: 'n-protocol',
+    type: 'import',
+    info: {
+      title: 'TypeScript Import',
+      badge: 'import', badgeColor: '#7777cc',
+      desc: 'Raycast imports URL constants and types. No more hardcoded BRIDGE_URL in every file.',
+      up: [
+        '<code>BRIDGE_HTTP_URL</code> — bridge base URL',
+        '<code>DATA_DIR_NAME</code> / <code>COMMANDS_FILENAME</code> — cache file path',
+        '<code>CommandDef</code> — for command list UI',
+        '<code>BookmarkResult</code> — for search results',
+      ],
+      down: [],
+      types: '<code>import { ... } from \'@extension/protocol\'</code>'
+    }
+  },
+  {
+    id: 'internal-ext-content',
+    from: 'n-ext', to: 'n-content',
+    type: 'internal',
+    info: {
+      title: 'chrome.runtime Messages',
+      badge: 'internal', badgeColor: '#888',
+      desc: 'Content script communicates with the service worker via Chrome\'s internal messaging API.',
+      up: [
+        '<code>EXECUTE_COMMAND</code> — run a command from palette',
+        '<code>SEARCH_BOOKMARKS</code> — search from palette UI',
+        '<code>OPEN_OPTIONS_PAGE</code> — open settings',
+      ],
+      down: [
+        '<code>TOGGLE_COMMAND_PALETTE</code> — keyboard shortcut relay',
+      ],
+      types: 'Typed as <code>ExtensionMessage</code> with <code>sendExtensionMessage()</code> wrapper'
+    }
+  },
+];
+
+// Draw connections
+function drawConnections() {
+  // Clear existing
+  svg.querySelectorAll('.conn').forEach(el => el.remove());
+
+  connections.forEach(conn => {
+    const from = edgePoint(conn.from, conn.to);
+    const to = edgePoint(conn.to, conn.from);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', from.x);
+    line.setAttribute('y1', from.y);
+    line.setAttribute('x2', to.x);
+    line.setAttribute('y2', to.y);
+    line.setAttribute('marker-end', `url(#arrow-${conn.type})`);
+    line.classList.add('conn', `conn-${conn.type}`);
+    line.dataset.id = conn.id;
+
+    // Wider invisible hit area
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    hit.setAttribute('x1', from.x);
+    hit.setAttribute('y1', from.y);
+    hit.setAttribute('x2', to.x);
+    hit.setAttribute('y2', to.y);
+    hit.setAttribute('stroke', 'transparent');
+    hit.setAttribute('stroke-width', '16');
+    hit.style.cursor = 'pointer';
+    hit.style.pointerEvents = 'stroke';
+
+    hit.addEventListener('click', (e) => showDetail(conn, e));
+    hit.addEventListener('mouseenter', () => line.classList.add('active'));
+    hit.addEventListener('mouseleave', () => { if (activeConn !== conn.id) line.classList.remove('active'); });
+
+    svg.appendChild(line);
+    svg.appendChild(hit);
+  });
+}
+
+function showDetail(conn, e) {
+  const info = conn.info;
+  // Deactivate previous
+  if (activeConn) {
+    svg.querySelector(`.conn[data-id="${activeConn}"]`)?.classList.remove('active');
+  }
+  activeConn = conn.id;
+  svg.querySelector(`.conn[data-id="${conn.id}"]`)?.classList.add('active');
+
+  let html = `<h4>${info.title} <span class="badge" style="background:${info.badgeColor}22;color:${info.badgeColor}">${info.badge}</span></h4>`;
+  html += `<p style="color:#999;margin-bottom:10px">${info.desc}</p>`;
+
+  if (info.up.length) {
+    const label = info.badge === 'import' ? 'Imports' : (info.badge === 'http' ? 'Endpoints' : 'Upstream (to bridge)');
+    html += `<div class="direction">${label}</div><ul>`;
+    info.up.forEach(item => html += `<li>${item}</li>`);
+    html += '</ul>';
+  }
+  if (info.down.length) {
+    html += `<div class="direction">Downstream (from bridge)</div><ul>`;
+    info.down.forEach(item => html += `<li>${item}</li>`);
+    html += '</ul>';
+  }
+  if (info.types) {
+    html += `<p style="margin-top:10px;color:#666;font-size:11px">${info.types}</p>`;
+  }
+
+  detailContent.innerHTML = html;
+
+  // Position near the click
+  const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+  let left = e.clientX - canvasRect.left + 16;
+  let top = e.clientY - canvasRect.top - 20;
+  if (left + 330 > canvasRect.width) left = left - 360;
+  if (top + 300 > canvasRect.height) top = canvasRect.height - 320;
+  if (top < 0) top = 10;
+
+  detail.style.left = left + 'px';
+  detail.style.top = top + 'px';
+  detail.classList.add('visible');
+}
+
+function hideDetail() {
+  detail.classList.remove('visible');
+  if (activeConn) {
+    svg.querySelector(`.conn[data-id="${activeConn}"]`)?.classList.remove('active');
+    activeConn = null;
+  }
+}
+
+// Close on click outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.detail') && !e.target.closest('.conn') && !e.target.closest('line')) {
+    hideDetail();
+  }
+});
+
+// Draw on load and resize
+drawConnections();
+window.addEventListener('resize', drawConnections);
+</script>
+</body>
+</html>

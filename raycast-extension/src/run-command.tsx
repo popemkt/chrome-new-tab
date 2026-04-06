@@ -3,22 +3,15 @@ import { useEffect, useState } from 'react';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { BRIDGE_HTTP_URL, DATA_DIR_NAME, COMMANDS_FILENAME, type CommandDef } from '@extension/protocol';
 
-const BRIDGE_URL = 'http://127.0.0.1:19816';
-const COMMANDS_FILE = join(homedir(), '.popemkt', 'browser-extension', 'commands.json');
+const COMMANDS_FILE = join(homedir(), DATA_DIR_NAME, COMMANDS_FILENAME);
 
 /** Map of command IDs that have dedicated static Raycast commands */
 const STATIC_COMMANDS: Record<string, string> = {
   'open-options': 'open-options',
   'search-bookmarks': 'search-bookmarks',
 };
-
-interface CommandDef {
-  id: string;
-  label: string;
-  description?: string;
-  context: string;
-}
 
 interface FetchResult {
   commands: CommandDef[];
@@ -31,7 +24,7 @@ interface FetchResult {
 async function fetchCommands(): Promise<FetchResult> {
   // Try HTTP first
   try {
-    const res = await fetch(`${BRIDGE_URL}/commands`);
+    const res = await fetch(`${BRIDGE_HTTP_URL}/commands`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as { commands?: CommandDef[]; syncedAt?: string; chromeConnected?: boolean };
     return {
@@ -76,7 +69,7 @@ async function runCommand(commandId: string) {
   }
 
   try {
-    const res = await fetch(`${BRIDGE_URL}/execute`, {
+    const res = await fetch(`${BRIDGE_HTTP_URL}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ commandId }),

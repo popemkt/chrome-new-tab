@@ -21,6 +21,10 @@ declare namespace Preferences {
   export type RunCommand = ExtensionPreferences & {};
   /** Preferences accessible in the `reload-extension` command */
   export type ReloadExtension = ExtensionPreferences & {};
+  /** Preferences accessible in the `build-extension` command */
+  export type BuildExtension = ExtensionPreferences & {};
+  /** Preferences accessible in the `build-and-reload` command */
+  export type BuildAndReload = ExtensionPreferences & {};
 }
 
 declare namespace Arguments {
@@ -32,4 +36,8 @@ declare namespace Arguments {
   export type RunCommand = {};
   /** Arguments passed to the `reload-extension` command */
   export type ReloadExtension = {};
+  /** Arguments passed to the `build-extension` command */
+  export type BuildExtension = {};
+  /** Arguments passed to the `build-and-reload` command */
+  export type BuildAndReload = {};
 }

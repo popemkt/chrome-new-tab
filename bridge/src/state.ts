@@ -1,14 +1,10 @@
 import fs from 'node:fs';
 import { WebSocket } from 'ws';
+import type { CommandDef } from '@extension/protocol';
 import { COMMANDS_FILE } from './config.ts';
 import { log } from './logger.ts';
 
-export interface CommandDef {
-  id: string;
-  label: string;
-  description?: string;
-  context: string;
-}
+export type { CommandDef };
 
 // --- In-memory state ---
 

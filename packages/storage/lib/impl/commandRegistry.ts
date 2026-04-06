@@ -1,11 +1,5 @@
-/** Shared command definitions used by the extension, command palette, and Raycast */
-export interface CommandDef {
-  id: string;
-  label: string;
-  description?: string;
-  /** Which context can run this command */
-  context: 'background' | 'content';
-}
+export type { CommandDef } from '@extension/protocol';
+import type { CommandDef } from '@extension/protocol';
 
 export const commandRegistry: CommandDef[] = [
   {

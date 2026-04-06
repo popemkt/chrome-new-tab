@@ -6,8 +6,7 @@ import {
   type ExtensionMessage,
   type BookmarkResult,
 } from '@extension/storage';
-
-const BRIDGE_WS_URL = 'ws://127.0.0.1:19816';
+import { BRIDGE_WS_URL, type BridgeDownMessage } from '@extension/protocol';
 const RECONNECT_DELAY = 5_000;
 
 // --- WebSocket Bridge ---
@@ -52,7 +51,7 @@ function connectBridge() {
     };
 
     ws.onmessage = event => {
-      let msg: { type: string; commandId?: string; query?: string; requestId?: string };
+      let msg: BridgeDownMessage;
       try {
         msg = JSON.parse(event.data as string);
       } catch {
@@ -65,17 +64,17 @@ function connectBridge() {
           chrome.runtime.reload();
           break;
         case 'EXECUTE_COMMAND':
-          if (msg.commandId) executeCommand(msg.commandId);
+          executeCommand(msg.commandId);
           break;
         case 'SEARCH_BOOKMARKS':
-          if (msg.query) {
-            searchBookmarks(msg.query).then(bookmarks => {
-              ws?.send(JSON.stringify({ type: 'RESPONSE', requestId: msg.requestId, data: { bookmarks } }));
-            });
-          }
+          searchBookmarks(msg.query).then(bookmarks => {
+            ws?.send(JSON.stringify({ type: 'RESPONSE', requestId: msg.requestId, data: { bookmarks } }));
+          });
           break;
         case 'SYNC_ACK':
           console.log('Commands synced to bridge');
+          break;
+        case 'PONG':
           break;
       }
     };
@@ -193,4 +192,4 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendRe
   return true;
 });
 
-console.log('Background service loaded');
+console.log(`Background service loaded at ${new Date().toISOString()}`);

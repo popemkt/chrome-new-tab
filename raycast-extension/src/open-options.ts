@@ -1,10 +1,9 @@
 import { showToast, Toast, showHUD } from '@raycast/api';
-
-const BRIDGE_URL = 'http://127.0.0.1:19816';
+import { BRIDGE_HTTP_URL } from '@extension/protocol';
 
 export default async function OpenOptions() {
   try {
-    const res = await fetch(`${BRIDGE_URL}/execute`, {
+    const res = await fetch(`${BRIDGE_HTTP_URL}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ commandId: 'open-options' }),

@@ -1,0 +1,7 @@
+{
+  "extends": "@extension/tsconfig/module",
+  "include": ["src"],
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
