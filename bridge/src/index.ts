@@ -21,12 +21,16 @@ import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { BRIDGE_PORT, DATA_DIR, PID_FILE } from './config.ts';
 import { log } from './logger.ts';
+import { startBrowserProbe } from './state.ts';
 import { handleRequest } from './routes.ts';
 import { handleConnection } from './websocket.ts';
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 log(`Bridge started. PID=${process.pid} Node=${process.version}`);
+
+// Start probing browser/CDP status
+startBrowserProbe();
 
 // --- HTTP server ---
 

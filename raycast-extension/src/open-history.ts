@@ -1,0 +1,23 @@
+import { showToast, Toast } from '@raycast/api';
+import { BRIDGE_HTTP_URL } from '@extension/protocol';
+
+export default async function openHistory() {
+  try {
+    const res = await fetch(`${BRIDGE_HTTP_URL}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commandId: 'open-history' }),
+    });
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      await showToast({ style: Toast.Style.Failure, title: 'Failed', message: data.error || `HTTP ${res.status}` });
+      return;
+    }
+  } catch {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: 'Bridge not reachable',
+      message: 'Make sure the bridge is running.',
+    });
+  }
+}

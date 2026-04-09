@@ -11,6 +11,7 @@ const COMMANDS_FILE = join(homedir(), DATA_DIR_NAME, COMMANDS_FILENAME);
 const STATIC_COMMANDS: Record<string, string> = {
   'open-options': 'open-options',
   'search-bookmarks': 'search-bookmarks',
+  'open-history': 'open-history',
 };
 
 interface FetchResult {

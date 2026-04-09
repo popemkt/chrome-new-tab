@@ -20,4 +20,10 @@ export const commandRegistry: CommandDef[] = [
     description: 'Search and open browser bookmarks',
     context: 'content',
   },
+  {
+    id: 'open-history',
+    label: 'Open History',
+    description: 'Open the browser history panel',
+    context: 'background',
+  },
 ];

@@ -40,7 +40,7 @@
     "bridge": "node --experimental-strip-types bridge/src/index.ts",
     "dev:bridge": "node --watch --experimental-strip-types bridge/src/index.ts",
     "dev:raycast": "pnpm -F popemkt-browser-ext dev",
-    "dev:all": "pnpm dev:bridge & pnpm dev:raycast & wait",
+    "dev:all": "pnpm dlx concurrently -n bridge,raycast -c green,yellow \"pnpm dev:bridge\" \"pnpm dev:raycast\"",
     "test:bridge": "node --experimental-strip-types --test tests/bridge/bridge.test.ts",
     "setup": "pwsh setup.ps1",
     "setup:raycast": "pwsh raycast-extension/install.ps1"

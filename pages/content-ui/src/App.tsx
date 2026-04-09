@@ -147,6 +147,7 @@ export default function App() {
                 setSelectedIndex(0);
               }
             : () => {
+                close();
                 sendExtensionMessage({ type: 'EXECUTE_COMMAND', commandId: def.id });
               },
       })),
@@ -195,13 +196,9 @@ export default function App() {
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
-  const executeCommand = useCallback(
-    (cmd: Command) => {
-      close();
-      cmd.action();
-    },
-    [close],
-  );
+  const executeCommand = useCallback((cmd: Command) => {
+    cmd.action();
+  }, []);
 
   const openBookmark = useCallback(
     (bookmark: BookmarkResult) => {
@@ -276,11 +273,7 @@ export default function App() {
         case 'Escape':
           e.preventDefault();
           e.stopPropagation();
-          if (mode === 'bookmarks') {
-            goBack();
-          } else {
-            close();
-          }
+          close();
           break;
         case 'Backspace':
           if (mode === 'bookmarks' && query === '') {
@@ -332,7 +325,6 @@ export default function App() {
         role="button"
         tabIndex={-1}
         onClick={close}
-        onKeyDown={e => e.key === 'Escape' && close()}
         style={{
           position: 'fixed',
           inset: 0,
