@@ -180,11 +180,18 @@ describe('Bridge server', () => {
 
   describe('after extension disconnects', () => {
     before(async () => {
-      // The previous test suite already synced commands, so they're cached.
-      // Just connect and immediately disconnect to test the disconnection state.
+      // Sync commands explicitly so this suite is independent of test order
       const ext = await connectMockExtension();
+      await sendAndWait(
+        ext,
+        {
+          type: 'SYNC_COMMANDS',
+          commands: [{ id: 'cached-cmd', label: 'Cached', context: 'background' }],
+          extensionId: 'disconnect-test',
+        },
+        msg => msg.type === 'SYNC_ACK',
+      );
       ext.close();
-      // Wait for the server to process the close
       await new Promise(r => setTimeout(r, 500));
     });
 
@@ -202,6 +209,99 @@ describe('Bridge server', () => {
     it('POST /execute returns 503', async () => {
       const { status } = await post('/execute', { commandId: 'cached-cmd' });
       assert.equal(status, 503);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Single-client policy
+  // ---------------------------------------------------------------------------
+
+  describe('single-client policy', () => {
+    it('new connection closes the existing one', async () => {
+      const first = await connectMockExtension();
+
+      const firstClosed = new Promise<number | null>(resolve => {
+        first.on('close', (code: number) => resolve(code));
+      });
+
+      const second = await connectMockExtension();
+
+      // First client should be closed by the server
+      const closeCode = await firstClosed;
+      assert.equal(closeCode, 1000);
+
+      // Health should still show connected (via second client)
+      const { data } = await get('/health');
+      assert.equal(data.chromeConnected, true);
+
+      second.close();
+      await new Promise(r => setTimeout(r, 300));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Reconnection
+  // ---------------------------------------------------------------------------
+
+  describe('reconnection', () => {
+    it('reconnecting restores chromeConnected and preserves cached commands', async () => {
+      // Connect, sync, disconnect
+      const ext1 = await connectMockExtension();
+      await sendAndWait(
+        ext1,
+        {
+          type: 'SYNC_COMMANDS',
+          commands: [{ id: 'reconnect-cmd', label: 'Reconnect', context: 'background' }],
+          extensionId: 'reconnect-test',
+        },
+        msg => msg.type === 'SYNC_ACK',
+      );
+      ext1.close();
+      await new Promise(r => setTimeout(r, 300));
+
+      const { data: disconnected } = await get('/health');
+      assert.equal(disconnected.chromeConnected, false);
+
+      // Reconnect
+      const ext2 = await connectMockExtension();
+      const { data: reconnected } = await get('/health');
+      assert.equal(reconnected.chromeConnected, true);
+
+      // Cached commands survive the cycle
+      const { data: cmds } = await get('/commands');
+      assert.ok((cmds.commands as unknown[]).length > 0);
+
+      ext2.close();
+      await new Promise(r => setTimeout(r, 300));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Relay timeout
+  // ---------------------------------------------------------------------------
+
+  describe('relay timeout', () => {
+    it('GET /search-bookmarks returns 504 when extension does not respond', async () => {
+      const silentExt = await connectMockExtension();
+
+      // Sync so the extension is "ready", but ignore incoming relay messages
+      await sendAndWait(
+        silentExt,
+        {
+          type: 'SYNC_COMMANDS',
+          commands: [{ id: 'timeout-cmd', label: 'Timeout', context: 'background' }],
+          extensionId: 'timeout-test',
+        },
+        msg => msg.type === 'SYNC_ACK',
+      );
+
+      const res = await fetch(`${BRIDGE_URL}/search-bookmarks?q=timeout-query`);
+      assert.equal(res.status, 504);
+      const body = (await res.json()) as Record<string, unknown>;
+      assert.ok((body.error as string).includes('Timeout'));
+
+      silentExt.close();
+      await new Promise(r => setTimeout(r, 300));
     });
   });
 });

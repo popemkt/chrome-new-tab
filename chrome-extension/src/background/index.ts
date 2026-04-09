@@ -6,7 +6,7 @@ import {
   type ExtensionMessage,
   type BookmarkResult,
 } from '@extension/storage';
-import { BRIDGE_WS_URL, type BridgeDownMessage } from '@extension/protocol';
+import { BRIDGE_WS_URL, BRIDGE_HTTP_URL, type BridgeDownMessage } from '@extension/protocol';
 const RECONNECT_DELAY = 5_000;
 
 // --- WebSocket Bridge ---
@@ -135,6 +135,14 @@ function executeCommand(commandId: string) {
       break;
     case 'toggle-theme':
       exampleThemeStorage.toggle();
+      break;
+    case 'open-history':
+      // Relay to bridge — it sends Ctrl+H via CDP to open the Edge history panel
+      fetch(`${BRIDGE_HTTP_URL}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandId: 'open-history' }),
+      }).catch(() => console.warn('Bridge not reachable for open-history'));
       break;
     default:
       console.warn('Unknown command:', commandId);

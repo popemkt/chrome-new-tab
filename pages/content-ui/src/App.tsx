@@ -132,6 +132,22 @@ export default function App() {
 
   const debouncedQuery = useDebounce(query, 300);
 
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setQuery('');
+    setSelectedIndex(0);
+    setMode('commands');
+    setBookmarks([]);
+  }, []);
+
+  const goBack = useCallback(() => {
+    setMode('commands');
+    setQuery('');
+    setSelectedIndex(0);
+    setBookmarks([]);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   // Build commands — search-bookmarks switches mode instead of sending a message
   const commands: Command[] = useMemo(
     () =>
@@ -147,10 +163,11 @@ export default function App() {
                 setSelectedIndex(0);
               }
             : () => {
+                close();
                 sendExtensionMessage({ type: 'EXECUTE_COMMAND', commandId: def.id });
               },
       })),
-    [],
+    [close],
   );
 
   const filteredCommands = useMemo(
@@ -179,29 +196,9 @@ export default function App() {
     });
   }, [debouncedQuery, mode]);
 
-  const close = useCallback(() => {
-    setIsOpen(false);
-    setQuery('');
-    setSelectedIndex(0);
-    setMode('commands');
-    setBookmarks([]);
+  const executeCommand = useCallback((cmd: Command) => {
+    cmd.action();
   }, []);
-
-  const goBack = useCallback(() => {
-    setMode('commands');
-    setQuery('');
-    setSelectedIndex(0);
-    setBookmarks([]);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
-
-  const executeCommand = useCallback(
-    (cmd: Command) => {
-      close();
-      cmd.action();
-    },
-    [close],
-  );
 
   const openBookmark = useCallback(
     (bookmark: BookmarkResult) => {
@@ -276,11 +273,7 @@ export default function App() {
         case 'Escape':
           e.preventDefault();
           e.stopPropagation();
-          if (mode === 'bookmarks') {
-            goBack();
-          } else {
-            close();
-          }
+          close();
           break;
         case 'Backspace':
           if (mode === 'bookmarks' && query === '') {
@@ -328,11 +321,11 @@ export default function App() {
   return (
     <>
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events -- Esc is handled by capture-phase document listener */}
       <div
         role="button"
         tabIndex={-1}
         onClick={close}
-        onKeyDown={e => e.key === 'Escape' && close()}
         style={{
           position: 'fixed',
           inset: 0,

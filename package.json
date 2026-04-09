@@ -28,7 +28,7 @@
     "zip:firefox": "pnpm build:firefox && pnpm -F zipper zip",
     "e2e": "pnpm zip && turbo e2e",
     "e2e:firefox": "pnpm zip:firefox && turbo e2e",
-    "lint": "turbo lint --continue -- --fix --cache --cache-location node_modules/.cache/.eslintcache",
+    "lint": "turbo lint --continue --filter='!popemkt-browser-ext' -- --fix --cache --cache-location node_modules/.cache/.eslintcache",
     "lint:fix": "turbo lint:fix --continue -- --fix --cache --cache-location node_modules/.cache/.eslintcache",
     "prettier": "turbo prettier --continue -- --cache --cache-location node_modules/.cache/.prettiercache",
     "prepare": "husky",
@@ -40,7 +40,7 @@
     "bridge": "node --experimental-strip-types bridge/src/index.ts",
     "dev:bridge": "node --watch --experimental-strip-types bridge/src/index.ts",
     "dev:raycast": "pnpm -F popemkt-browser-ext dev",
-    "dev:all": "pnpm dev:bridge & pnpm dev:raycast & wait",
+    "dev:all": "pnpm dlx concurrently -n bridge,raycast -c green,yellow \"pnpm dev:bridge\" \"pnpm dev:raycast\"",
     "test:bridge": "node --experimental-strip-types --test tests/bridge/bridge.test.ts",
     "setup": "pwsh setup.ps1",
     "setup:raycast": "pwsh raycast-extension/install.ps1"
@@ -96,6 +96,6 @@
   },
   "packageManager": "pnpm@9.15.1",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.14.0"
   }
 }

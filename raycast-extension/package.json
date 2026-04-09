@@ -26,6 +26,12 @@
       "mode": "view"
     },
     {
+      "name": "open-history",
+      "title": "Open History",
+      "description": "Open the browser history panel",
+      "mode": "no-view"
+    },
+    {
       "name": "reload-extension",
       "title": "Dev: Reload Extension",
       "description": "Reload the Chrome/Edge extension via the bridge",

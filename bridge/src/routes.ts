@@ -1,10 +1,9 @@
 import http from 'node:http';
 import { exec } from 'node:child_process';
-import { WebSocket } from 'ws';
 import { BRIDGE_PORT, PROJECT_ROOT } from './config.ts';
 import { log } from './logger.ts';
-import { commands, syncedAt, extensionId, chromeSocket, sendToChrome, requestChrome } from './state.ts';
-import { reloadExtensionViaCDP } from './devtools.ts';
+import { ctx, sendToChrome, requestChrome } from './state.ts';
+import { reloadExtensionViaCDP, sendBrowserShortcut } from './devtools.ts';
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise(resolve => {
@@ -20,7 +19,7 @@ function json(res: http.ServerResponse, status: number, data: unknown) {
 }
 
 function requireChrome(res: http.ServerResponse): boolean {
-  if (!chromeSocket || chromeSocket.readyState !== WebSocket.OPEN) {
+  if (!ctx.extension.connected) {
     json(res, 503, { error: 'Chrome is not connected' });
     return false;
   }
@@ -33,20 +32,21 @@ export async function handleRequest(req: http.IncomingMessage, res: http.ServerR
   if (method === 'GET' && url === '/health') {
     return json(res, 200, {
       ok: true,
-      chromeConnected: chromeSocket?.readyState === WebSocket.OPEN,
-      commandCount: commands.length,
-      syncedAt,
-      pid: process.pid,
-      uptime: Math.floor(process.uptime()),
+      chromeConnected: ctx.extension.connected,
+      bridge: { pid: process.pid, uptime: Math.floor(process.uptime()) },
+      extension: { connected: ctx.extension.connected, id: ctx.extension.id },
+      browser: ctx.browser,
+      commandCount: ctx.commands.length,
+      syncedAt: ctx.syncedAt,
     });
   }
 
   if (method === 'GET' && url === '/commands') {
     return json(res, 200, {
-      commands,
-      syncedAt,
-      extensionId,
-      chromeConnected: chromeSocket?.readyState === WebSocket.OPEN,
+      commands: ctx.commands,
+      syncedAt: ctx.syncedAt,
+      extensionId: ctx.extension.id,
+      chromeConnected: ctx.extension.connected,
     });
   }
 
@@ -55,6 +55,24 @@ export async function handleRequest(req: http.IncomingMessage, res: http.ServerR
     try {
       const { commandId } = JSON.parse(body);
       if (!commandId || typeof commandId !== 'string') return json(res, 400, { error: 'Missing commandId' });
+
+      // Commands handled directly by the bridge (via CDP, no extension needed)
+      const browserShortcuts: Record<string, { key: string; ctrl?: boolean }> = {
+        'open-history': { key: 'h', ctrl: true },
+      };
+      const shortcut = browserShortcuts[commandId];
+      if (shortcut) {
+        log(`HTTP execute (browser shortcut): ${commandId}`);
+        try {
+          await sendBrowserShortcut(shortcut.key, { ctrl: shortcut.ctrl });
+          return json(res, 200, { ok: true, commandId, method: 'cdp-shortcut' });
+        } catch (err) {
+          log(`CDP shortcut failed: ${(err as Error).message}`);
+          return json(res, 500, { error: (err as Error).message });
+        }
+      }
+
+      // Commands relayed to the extension via WebSocket
       if (!requireChrome(res)) return;
       log(`HTTP execute: ${commandId}`);
       sendToChrome({ type: 'EXECUTE_COMMAND', commandId });
@@ -65,16 +83,29 @@ export async function handleRequest(req: http.IncomingMessage, res: http.ServerR
   }
 
   if (method === 'POST' && url === '/reload-extension') {
-    if (!extensionId) return json(res, 400, { error: 'Extension ID not known yet (has it connected?)' });
+    if (!ctx.extension.id) return json(res, 400, { error: 'Extension ID not known yet (has it connected?)' });
     log('HTTP reload-extension');
     try {
-      await reloadExtensionViaCDP(extensionId);
+      await reloadExtensionViaCDP(ctx.extension.id);
       return json(res, 200, { ok: true, method: 'cdp' });
     } catch (err) {
       log(`CDP reload failed: ${(err as Error).message}, falling back to WS`);
       if (!requireChrome(res)) return;
       sendToChrome({ type: 'RELOAD_EXTENSION' });
       return json(res, 200, { ok: true, method: 'websocket-fallback' });
+    }
+  }
+
+  if (method === 'POST' && url === '/browser/shortcut') {
+    const body = await readBody(req);
+    try {
+      const { key, ctrl, shift, alt } = JSON.parse(body);
+      if (!key || typeof key !== 'string') return json(res, 400, { error: 'Missing key' });
+      log(`HTTP browser/shortcut: ${ctrl ? 'Ctrl+' : ''}${shift ? 'Shift+' : ''}${alt ? 'Alt+' : ''}${key}`);
+      await sendBrowserShortcut(key, { ctrl, shift, alt });
+      return json(res, 200, { ok: true });
+    } catch (err) {
+      return json(res, 500, { error: (err as Error).message });
     }
   }
 
