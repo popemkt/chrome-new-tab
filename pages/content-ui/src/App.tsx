@@ -151,7 +151,7 @@ export default function App() {
                 sendExtensionMessage({ type: 'EXECUTE_COMMAND', commandId: def.id });
               },
       })),
-    [],
+    [close],
   );
 
   const filteredCommands = useMemo(
@@ -321,6 +321,7 @@ export default function App() {
   return (
     <>
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events -- Esc is handled by capture-phase document listener */}
       <div
         role="button"
         tabIndex={-1}
