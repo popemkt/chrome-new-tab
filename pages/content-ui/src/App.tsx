@@ -132,6 +132,22 @@ export default function App() {
 
   const debouncedQuery = useDebounce(query, 300);
 
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setQuery('');
+    setSelectedIndex(0);
+    setMode('commands');
+    setBookmarks([]);
+  }, []);
+
+  const goBack = useCallback(() => {
+    setMode('commands');
+    setQuery('');
+    setSelectedIndex(0);
+    setBookmarks([]);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   // Build commands — search-bookmarks switches mode instead of sending a message
   const commands: Command[] = useMemo(
     () =>
@@ -179,22 +195,6 @@ export default function App() {
       setSelectedIndex(0);
     });
   }, [debouncedQuery, mode]);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
-    setQuery('');
-    setSelectedIndex(0);
-    setMode('commands');
-    setBookmarks([]);
-  }, []);
-
-  const goBack = useCallback(() => {
-    setMode('commands');
-    setQuery('');
-    setSelectedIndex(0);
-    setBookmarks([]);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
 
   const executeCommand = useCallback((cmd: Command) => {
     cmd.action();
